@@ -40,6 +40,7 @@ func Connect(dsn string) (*gorm.DB, error) {
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
+	log.Println("database connect successful")
 
 	return db, nil
 }

@@ -26,11 +26,11 @@ func Load() *Config {
 
 	if cfg.DatabaseURL == "" {
 		
-		host := getEnv("DB_HOST")
-		port := getEnv("DB_PORT")
-		user := getEnv("DB_USER")
-		pass := getEnv("DB_PASSWORD")
-		name := getEnv("DB_NAME")
+		host := getEnv("DB_HOST", "localhost")
+		port := getEnv("DB_PORT", "5432")
+		user := getEnv("DB_USER", "postgres")
+		pass := getEnv("DB_PASSWORD", "postgres")
+		name := getEnv("DB_NAME", "taladsync")
 		ssl := getEnv("DB_SSLMODE", "disable")
 		cfg.DatabaseURL = fmt.Sprintf(
 			"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s TimeZone=Asia/Bangkok",
