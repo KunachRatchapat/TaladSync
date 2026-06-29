@@ -11,6 +11,7 @@ var (
 	ErrBookingNotFound   = errors.New("booking not found")
 	ErrInvalidRole       = errors.New("invalid role")
 	ErrForbidden         = errors.New("forbidden")
+	ErrUserNotFound      = errors.New("user not found")
 )
 
 type BookStallInput struct {

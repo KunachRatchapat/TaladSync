@@ -7,8 +7,13 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
+	"taladsync/internal/auth"
 	"taladsync/internal/config"
 	"taladsync/internal/database"
+	"taladsync/internal/handler"
+	"taladsync/internal/middleware"
+	"taladsync/internal/repository"
+	"taladsync/internal/usecase"
 )
 
 func main() {
@@ -25,6 +30,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	userRepo := repository.NewUserRepository(db)
+	tokenSvc := auth.NewTokenService([]byte(cfg.JWTSecret))
+	authUC := usecase.NewAuthUsecase(userRepo, tokenSvc)
+	authHandler := handler.NewAuthHandler(authUC)
+
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
@@ -33,7 +43,11 @@ func main() {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
 
-	_ = db 
+	api := app.Group("/api")
+	api.Post("/auth/mock-login", authHandler.MockLogin)
+
+	protected := api.Group("/auth", middleware.Auth(tokenSvc))
+	protected.Get("/me", authHandler.Me)
 
 	addr := ":" + cfg.AppPort
 	log.Printf("listening on %s", addr)

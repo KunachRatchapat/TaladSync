@@ -13,7 +13,7 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend fresh restart — **Phase 2 done** (seed dev data: users 3 roles, stalls 20, daily_bookings วันนี้). ยังไม่มี business API
+**สถานะรวม:** Backend — **Phase 3 done** (auth: mock-login, JWT middleware, `/api/auth/me`). ถัดไป Phase 4 booking core
 
 ### Incremental roadmap
 
@@ -22,7 +22,7 @@
 | 0 | **DONE** | Health API — `cmd/api/main.go` + `GET /health` |
 | 1 | **DONE** | Domain models (4 tables) + Postgres connect + migrate |
 | 2 | **DONE** | Seed (users 3 roles, stalls, daily_bookings) |
-| 3 | TODO | Auth mock-login + JWT middleware |
+| 3 | **DONE** | Auth mock-login + JWT middleware + `GET /api/auth/me` |
 | 4 | TODO | Booking core (list + book + 409) |
 | 5 | TODO | Vendor leave + staff attendance |
 | 6 | TODO | Directory |
@@ -33,20 +33,24 @@
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
-| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB connect/migrate + `GET /health` |
+| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth routes |
 | **config** | `backend/internal/config/config.go` | env loader (APP_PORT, DB_*, JWT_SECRET) |
 | **domain** | `backend/internal/domain/models.go`, `errors.go` | User, Stall, DailyBooking, AuditLog + business errors |
 | **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate, SeedIfEmpty |
+| **auth** | `backend/internal/auth/jwt.go` | TokenService Sign/Parse (HS256) |
+| **repository** | `backend/internal/repository/user.go` | FindByRole, FindByID |
+| **usecase** | `backend/internal/usecase/auth.go` | MockLogin, GetMe |
+| **handler** | `backend/internal/handler/auth.go`, `errors.go` | mock-login, /me, error mapping |
+| **middleware** | `backend/internal/middleware/auth.go`, `role.go` | JWT Auth, RequireRoles |
 | **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()` Asia/Bangkok |
 | **env** | `backend/.env.example` | template สำหรับ dev |
-| **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres driver |
+| **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
 
-### TODO (Phase 3 — ทำต่อจากตรงนี้)
+### TODO (Phase 4 — ทำต่อจากตรงนี้)
 
-1. **Auth** — JWT, middleware, mock-login handler
-2. **Booking core** — repository, usecase, handler, concurrent test
-3. **Vendor + Staff + Directory** — handlers ที่เหลือ
-4. **DevOps** — `docker-compose.yml`, README dev setup
+1. **Booking core** — repository, usecase, handler, concurrent test
+2. **Vendor + Staff + Directory** — handlers ที่เหลือ
+3. **DevOps** — `docker-compose.yml`, README dev setup
 
 ---
 
@@ -62,17 +66,17 @@
 **Dependency rule:** ลูกศรชี้เข้าด้านใน `handler → usecase → domain` ; `repository` implement interface ของ `usecase`
 
 ```
-cmd/api/main.go          ← DONE (health + DB migrate)
+cmd/api/main.go          ← DONE (health + auth routes)
 internal/
   config/                ← DONE
   domain/                ← DONE
   database/              ← DONE (connect + migrate + seed)
   pkg/timeutil/          ← DONE
-  usecase/               ← TODO Phase 3–6
-  repository/            ← TODO Phase 4–6
-  handler/               ← TODO Phase 3–6
-  middleware/            ← TODO Phase 3
-  auth/                  ← TODO Phase 3
+  auth/                  ← DONE (JWT)
+  repository/            ← DONE (user); TODO booking Phase 4
+  usecase/               ← DONE (auth); TODO booking Phase 4
+  handler/               ← DONE (auth); TODO booking Phase 4
+  middleware/            ← DONE (Auth, RequireRoles)
 ```
 
 **หมายเหตุ:** domain model มี gorm tag (pragmatic); testability มาจาก usecase พึ่ง interface ไม่ใช่ GORM ตรง ๆ
