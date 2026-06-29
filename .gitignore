@@ -1,0 +1,22 @@
+# Environment / secrets
+backend/.env
+*.env
+!*.env.example
+
+# Go build output
+*.exe
+*.test
+/backend/bin/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+docs/SYSTEM_DESIGN.md
+docs/BOOKING_FLOW.md
+
+.env.example
