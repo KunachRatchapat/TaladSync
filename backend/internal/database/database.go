@@ -54,6 +54,14 @@ func Migrate(db *gorm.DB) error {
 	); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
+	// กัน vendor จองมากกว่า 1 แผง/วัน แม้ request พร้อมกัน (race หลัง conditional UPDATE)
+	if err := db.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_vendor_one_booked_per_day
+		ON daily_bookings (vendor_id, market_date)
+		WHERE status = 'BOOKED' AND vendor_id IS NOT NULL
+	`).Error; err != nil {
+		return fmt.Errorf("create partial unique index: %w", err)
+	}
 	log.Println("database migrated")
 	return nil
 }

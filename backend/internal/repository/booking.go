@@ -2,8 +2,10 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"taladsync/internal/domain"
@@ -42,9 +44,15 @@ func (r *BookingRepository) TryBookStall(ctx context.Context, in domain.BookStal
 			"vendor_id":    in.VendorID,
 			"shop_name":    in.ShopName,
 			"product_type": in.ProductType,
-			"booked_at":    time.Now(),
+			"booked_at":    timeutil.Now(),
 		})
-	return res.RowsAffected, res.Error
+	if res.Error != nil {
+		if isDuplicateKey(res.Error) {
+			return 0, domain.ErrAlreadyHasStall
+		}
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
 }
 
 func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error) {
@@ -52,8 +60,16 @@ func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorI
 	var count int64
 	err := r.db.WithContext(ctx).
 		Model(&domain.DailyBooking{}).
-		Where("vendor_id = ? AND market_date = ? AND status IN ?",
-			vendorID, date, []domain.BookingStatus{domain.StatusExpected, domain.StatusBooked}).
+		Where("vendor_id = ? AND market_date = ? AND status = ?",
+			vendorID, date, domain.StatusBooked).
 		Count(&count).Error
 	return count, err
+}
+
+func isDuplicateKey(err error) bool {
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return true
+	}
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }

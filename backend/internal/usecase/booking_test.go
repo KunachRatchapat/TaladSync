@@ -90,3 +90,18 @@ func TestBookStall_StallNotAvailable(t *testing.T) {
 		t.Fatal("expected TryBookStall to be called")
 	}
 }
+
+func TestBookStall_AlreadyHasStall_UniqueViolation(t *testing.T) {
+	repo := &mockBookingRepo{countToday: 0, tryErr: domain.ErrAlreadyHasStall}
+	uc := NewBookingUsecase(repo)
+
+	err := uc.BookStall(context.Background(), domain.BookStallInput{
+		StallID: 13, VendorID: 2, MarketDate: time.Now(),
+	})
+	if !errors.Is(err, domain.ErrAlreadyHasStall) {
+		t.Fatalf("expected ErrAlreadyHasStall, got %v", err)
+	}
+	if !repo.tryBookCalled {
+		t.Fatal("expected TryBookStall to be called")
+	}
+}

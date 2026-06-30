@@ -23,6 +23,7 @@ type bookRequest struct {
 	StallID     uint   `json:"stallId"`
 	ShopName    string `json:"shopName"`
 	ProductType string `json:"productType"`
+	Date        string `json:"date,omitempty"`
 }
 
 func (h *BookingHandler) ListAvailable(c *fiber.Ctx) error {
@@ -51,10 +52,15 @@ func (h *BookingHandler) Book(c *fiber.Ctx) error {
 		return badRequest(c)
 	}
 
+	marketDate, err := parseMarketDate(req.Date)
+	if err != nil {
+		return badRequest(c)
+	}
+
 	err = h.uc.BookStall(c.Context(), domain.BookStallInput{
 		StallID:     req.StallID,
 		VendorID:    claims.UserID,
-		MarketDate:  timeutil.Today(),
+		MarketDate:  marketDate,
 		ShopName:    req.ShopName,
 		ProductType: req.ProductType,
 	})

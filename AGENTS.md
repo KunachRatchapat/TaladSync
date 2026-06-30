@@ -13,7 +13,20 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 4 done** (auth + booking: list available, book stall, 409, usecase unit test). ถัดไป Phase 5 vendor leave + staff attendance
+**สถานะรวม:** Backend — **Phase 4 done** (auth + booking: list available, book stall, 409, usecase unit test). **Session ถัดไป: code review ก่อน Phase 5**
+
+### Next session (อ่านก่อนเริ่ม Phase 5)
+
+Context แชทไม่ติดข้าม session — agent ใหม่อ่านไฟล์นี้ + โค้ดใน repo
+
+**ลำดับที่ต้องทำ:**
+
+1. **Code review Phase 3–4** (ก่อนเขียน Phase 5)
+   - โฟกัส: `repository/booking.go` (conditional UPDATE), `middleware/auth.go`, `handler/errors.go`, `auth/jwt.go`, `config.go` (ไม่มี secret จริง)
+   - ตรวจ: PII ไม่หลุด (`nationalId`), 409 mapping, clean architecture (usecase ไม่ import GORM)
+   - ใน Cursor: review uncommitted changes หรือ diff ตั้งแต่ Phase 3; ใช้ Bugbot / security review ได้
+2. **Commit + push** (ถ้า review ผ่านและยังไม่ push)
+3. **เริ่ม Phase 5** — vendor leave + staff attendance (ด้านล่าง)
 
 ### Incremental roadmap
 
@@ -46,7 +59,7 @@
 | **env** | `backend/.env.example` | template สำหรับ dev |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
 
-### TODO (Phase 5 — ทำต่อจากตรงนี้)
+### TODO (Phase 5 — หลัง code review แล้วเท่านั้น)
 
 1. **Vendor leave** — `POST /api/vendor/leave` (REGULAR → EXPECTED to AVAILABLE)
 2. **Staff attendance** — checklist, mark present/absent, summary + audit log
