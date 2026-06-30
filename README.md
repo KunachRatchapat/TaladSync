@@ -11,8 +11,8 @@ A daily fresh-market stall management system that solves two core pain points:
 
 ## 🚧 Project Status
 
-> **Fresh restart — Phase 2 done.** Dev seed data loads automatically when the database is empty (3 users, 20 stalls, today's daily_bookings).
-> Business API endpoints are not implemented yet.
+> **Phase 4 done.** Auth (mock-login, JWT, `/api/auth/me`) + booking (`GET /stalls/available`, `POST /bookings`, HTTP 409). Usecase unit tests for `BookStall`.
+> Vendor leave, staff roll-call, directory, concurrent test, and Docker — not yet implemented.
 > See the incremental roadmap in [`AGENTS.md`](AGENTS.md).
 
 ---
@@ -41,13 +41,17 @@ handler → usecase → domain
 ```
 backend/
 ├── .env.example
-├── cmd/api/main.go   # entrypoint (health + DB migrate)
+├── cmd/api/main.go          # entrypoint
 └── internal/
-    ├── config/       # env loading
-    ├── domain/       # models + business errors
-    ├── database/     # connect + migrate + seed
-    └── pkg/timeutil/ # market_date (Asia/Bangkok)
-    # usecase, repository, handler, … — TODO Phase 3+
+    ├── auth/                # JWT Sign/Parse
+    ├── config/              # env loading
+    ├── domain/              # models + business errors
+    ├── database/            # connect + migrate + seed
+    ├── handler/             # auth, booking HTTP
+    ├── middleware/          # JWT auth, RequireRoles
+    ├── repository/          # user, booking (GORM)
+    ├── usecase/             # auth, booking + unit tests
+    └── pkg/timeutil/        # market_date (Asia/Bangkok)
 ```
 
 ---
@@ -70,19 +74,20 @@ More detail: [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md)
 
 ---
 
-## 🔌 API (MVP)
+## 🔌 API
 
-| Method | Endpoint | Role | Description |
-|--------|----------|------|-------------|
-| POST | `/api/auth/mock-login` | public | `{role}` → `{token, user}` |
-| GET  | `/api/stalls/available?date=` | WALKIN | available stalls in the pool |
-| POST | `/api/bookings` | WALKIN | book a stall (409 if taken) |
-| POST | `/api/vendor/leave` | REGULAR | report a day off |
-| GET  | `/api/staff/checklist?date=` | STAFF | roll-call of every occupied stall |
-| POST | `/api/bookings/:id/attendance` | STAFF | mark present/absent (idempotent) |
-| GET  | `/api/staff/summary?date=` | STAFF | counts of present/no-show/pending |
-| GET  | `/api/directory?q=` | public | search shops (no PII) |
-| GET  | `/health` | public | health check |
+| Method | Endpoint | Role | Status |
+|--------|----------|------|--------|
+| GET | `/health` | public | ✅ |
+| POST | `/api/auth/mock-login` | public | ✅ |
+| GET | `/api/auth/me` | JWT | ✅ |
+| GET | `/api/stalls/available?date=` | WALKIN | ✅ |
+| POST | `/api/bookings` | WALKIN | ✅ |
+| POST | `/api/vendor/leave` | REGULAR | — |
+| GET | `/api/staff/checklist?date=` | STAFF | — |
+| POST | `/api/bookings/:id/attendance` | STAFF | — |
+| GET | `/api/staff/summary?date=` | STAFF | — |
+| GET | `/api/directory?q=` | public | — |
 
 ---
 
@@ -109,8 +114,27 @@ POST /api/auth/mock-login
 { "role": "WALKIN" }
 ```
 
-Available roles: `REGULAR` | `WALKIN` | `STAFF`
+Available roles: `REGULAR` | `WALKIN` | `STAFF`  
 Send the returned token in the header: `Authorization: Bearer <token>`
+
+### Booking flow (WALKIN)
+
+1. Mock-login with `{ "role": "WALKIN" }`
+2. `GET /api/stalls/available?date=2026-06-30` — list pool stalls (`P-01`…`P-08` in seed)
+3. `POST /api/bookings` with body:
+
+```json
+{ "stallId": 13, "shopName": "ร้านทด", "productType": "ผลไม้" }
+```
+
+Returns `201` on success, `409` if the stall was taken or vendor already booked today.
+
+### Tests
+
+```powershell
+cd backend
+go test ./internal/usecase/... -v -run BookStall
+```
 
 ---
 
@@ -122,7 +146,19 @@ Send the returned token in the header: `Authorization: Bearer <token>`
 
 ---
 
-## 🗺 Roadmap (Phase 2)
+## 🗺 Roadmap (backend MVP)
+
+| Phase | Status | Goal |
+|-------|--------|------|
+| 0–2 | ✅ | Health, schema, seed |
+| 3 | ✅ | Auth (mock-login, JWT, `/me`) |
+| 4 | ✅ | Booking (list + book + 409) |
+| 5 | — | Vendor leave + staff attendance |
+| 6 | — | Customer directory |
+| 7 | — | Concurrent load test (testcontainers) |
+| 8 | — | Docker Compose |
+
+## 🗺 Product Phase 2 (later)
 
 - Real LINE LIFF / Push notifications (Flash Drop)
 - Day-off quotas, emergency leave, long leave + approval

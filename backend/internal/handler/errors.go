@@ -18,6 +18,8 @@ var errMappings = []errMapping{
 	{domain.ErrInvalidRole, fiber.StatusBadRequest, "invalid role"},
 	{domain.ErrUserNotFound, fiber.StatusNotFound, "user not found"},
 	{domain.ErrForbidden, fiber.StatusForbidden, "forbidden"},
+	{domain.ErrStallNotAvailable, fiber.StatusConflict, "stall is not available"},
+	{domain.ErrAlreadyHasStall, fiber.StatusConflict, "vendor already booked today"},
 	{errUnauthorized, fiber.StatusUnauthorized, "unauthorized"},
 }
 

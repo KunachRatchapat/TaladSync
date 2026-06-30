@@ -13,7 +13,7 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 3 done** (auth: mock-login, JWT middleware, `/api/auth/me`). ถัดไป Phase 4 booking core
+**สถานะรวม:** Backend — **Phase 4 done** (auth + booking: list available, book stall, 409, usecase unit test). ถัดไป Phase 5 vendor leave + staff attendance
 
 ### Incremental roadmap
 
@@ -23,34 +23,36 @@
 | 1 | **DONE** | Domain models (4 tables) + Postgres connect + migrate |
 | 2 | **DONE** | Seed (users 3 roles, stalls, daily_bookings) |
 | 3 | **DONE** | Auth mock-login + JWT middleware + `GET /api/auth/me` |
-| 4 | TODO | Booking core (list + book + 409) |
+| 4 | **DONE** | Booking core — `GET /stalls/available`, `POST /bookings`, 409, usecase unit test |
 | 5 | TODO | Vendor leave + staff attendance |
 | 6 | TODO | Directory |
-| 7 | TODO | Concurrent test |
+| 7 | TODO | Concurrent test (testcontainers) |
 | 8 | TODO | DevOps (docker-compose) |
 
 ### DONE (มีไฟล์แล้ว)
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
-| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth routes |
+| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth + booking routes |
 | **config** | `backend/internal/config/config.go` | env loader (APP_PORT, DB_*, JWT_SECRET) |
 | **domain** | `backend/internal/domain/models.go`, `errors.go` | User, Stall, DailyBooking, AuditLog + business errors |
 | **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate, SeedIfEmpty |
 | **auth** | `backend/internal/auth/jwt.go` | TokenService Sign/Parse (HS256) |
-| **repository** | `backend/internal/repository/user.go` | FindByRole, FindByID |
-| **usecase** | `backend/internal/usecase/auth.go` | MockLogin, GetMe |
-| **handler** | `backend/internal/handler/auth.go`, `errors.go` | mock-login, /me, error mapping |
-| **middleware** | `backend/internal/middleware/auth.go`, `role.go` | JWT Auth, RequireRoles |
+| **repository** | `user.go`, `booking.go` | FindByRole/FindByID; ListAvailable, TryBookStall, CountVendorBookingToday |
+| **usecase** | `auth.go`, `booking.go`, `booking_test.go` | MockLogin, GetMe; BookStall + unit test |
+| **handler** | `auth.go`, `booking.go`, `errors.go` | mock-login, /me, stalls/available, bookings |
+| **middleware** | `auth.go`, `role.go` | JWT Auth, RequireRoles |
 | **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()` Asia/Bangkok |
 | **env** | `backend/.env.example` | template สำหรับ dev |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
 
-### TODO (Phase 4 — ทำต่อจากตรงนี้)
+### TODO (Phase 5 — ทำต่อจากตรงนี้)
 
-1. **Booking core** — repository, usecase, handler, concurrent test
-2. **Vendor + Staff + Directory** — handlers ที่เหลือ
-3. **DevOps** — `docker-compose.yml`, README dev setup
+1. **Vendor leave** — `POST /api/vendor/leave` (REGULAR → EXPECTED to AVAILABLE)
+2. **Staff attendance** — checklist, mark present/absent, summary + audit log
+3. **Directory** — `GET /api/directory?q=` (Phase 6)
+4. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
+5. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
 
 ---
 
@@ -66,16 +68,16 @@
 **Dependency rule:** ลูกศรชี้เข้าด้านใน `handler → usecase → domain` ; `repository` implement interface ของ `usecase`
 
 ```
-cmd/api/main.go          ← DONE (health + auth routes)
+cmd/api/main.go          ← DONE (health + auth + booking)
 internal/
   config/                ← DONE
   domain/                ← DONE
   database/              ← DONE (connect + migrate + seed)
   pkg/timeutil/          ← DONE
   auth/                  ← DONE (JWT)
-  repository/            ← DONE (user); TODO booking Phase 4
-  usecase/               ← DONE (auth); TODO booking Phase 4
-  handler/               ← DONE (auth); TODO booking Phase 4
+  repository/            ← DONE (user, booking)
+  usecase/               ← DONE (auth, booking + unit test)
+  handler/               ← DONE (auth, booking)
   middleware/            ← DONE (Auth, RequireRoles)
 ```
 
@@ -127,19 +129,20 @@ CheckedAt        *time.Time
 - Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
 - Audit: `CHECKIN`, `NOSHOW`, `BOOK`, `LEAVE` → `audit_logs`
 
-## API (MVP — scope ปัจจุบัน)
+## API (MVP — implemented vs TODO)
 
-| Method | Endpoint | Role | คำอธิบาย |
-|--------|----------|------|----------|
-| POST | `/api/auth/mock-login` | public | `{role}` → `{token, user}` |
-| GET | `/api/stalls/available?date=` | WALKIN | แผงว่างใน pool |
-| POST | `/api/bookings` | WALKIN | `{stallId, shopName, productType}` → 409 ถ้าเต็ม |
-| POST | `/api/vendor/leave` | REGULAR | `{stallId, date?}` แจ้งหยุด |
-| GET | `/api/staff/checklist?date=` | STAFF | roll-call ทุกแผงที่มีคน (EXPECTED+BOOKED) |
-| POST | `/api/bookings/:id/attendance` | STAFF | `{present: true/false}` เช็คมา/ไม่มา (idempotent) |
-| GET | `/api/staff/summary?date=` | STAFF | `{present, noShow, pending, total}` |
-| GET | `/api/directory?q=` | public | ค้นหาร้าน (ไม่มี PII) |
-| GET | `/health` | public | health check |
+| Method | Endpoint | Role | สถานะ | คำอธิบาย |
+|--------|----------|------|--------|----------|
+| GET | `/health` | public | **DONE** | health check |
+| POST | `/api/auth/mock-login` | public | **DONE** | `{role}` → `{token, user}` |
+| GET | `/api/auth/me` | any JWT | **DONE** | profile จาก token |
+| GET | `/api/stalls/available?date=` | WALKIN | **DONE** | แผงว่างใน pool |
+| POST | `/api/bookings` | WALKIN | **DONE** | `{stallId, shopName, productType}` → 409 ถ้าเต็ม |
+| POST | `/api/vendor/leave` | REGULAR | TODO | `{stallId, date?}` แจ้งหยุด |
+| GET | `/api/staff/checklist?date=` | STAFF | TODO | roll-call ทุกแผงที่มีคน |
+| POST | `/api/bookings/:id/attendance` | STAFF | TODO | `{present: true/false}` |
+| GET | `/api/staff/summary?date=` | STAFF | TODO | `{present, noShow, pending, total}` |
+| GET | `/api/directory?q=` | public | TODO | ค้นหาร้าน (ไม่มี PII) |
 
 ## การรัน (dev)
 
@@ -167,6 +170,16 @@ POST /api/auth/mock-login
 
 Role ที่ใช้ได้: `REGULAR` | `WALKIN` | `STAFF`  
 Header: `Authorization: Bearer <token>`
+
+## Booking (ทดสอบ — WALKIN)
+
+```
+1. POST /api/auth/mock-login  { "role": "WALKIN" }
+2. GET  /api/stalls/available?date=YYYY-MM-DD   (Bearer token)
+3. POST /api/bookings  { "stallId": 13, "shopName": "ร้านทด", "productType": "ผลไม้" }
+```
+
+Unit test: `go test ./internal/usecase/... -v -run BookStall`
 
 ## Phase 2 (ยังไม่ทำ)
 

@@ -10,6 +10,7 @@ import (
 	"taladsync/internal/auth"
 	"taladsync/internal/config"
 	"taladsync/internal/database"
+	"taladsync/internal/domain"
 	"taladsync/internal/handler"
 	"taladsync/internal/middleware"
 	"taladsync/internal/repository"
@@ -35,6 +36,10 @@ func main() {
 	authUC := usecase.NewAuthUsecase(userRepo, tokenSvc)
 	authHandler := handler.NewAuthHandler(authUC)
 
+	bookingRepo := repository.NewBookingRepository(db)
+	bookingUC := usecase.NewBookingUsecase(bookingRepo)
+	bookingHandler := handler.NewBookingHandler(bookingUC)
+
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
@@ -48,6 +53,10 @@ func main() {
 
 	protected := api.Group("/auth", middleware.Auth(tokenSvc))
 	protected.Get("/me", authHandler.Me)
+
+	walkin := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleWalkin))
+	walkin.Get("/stalls/available", bookingHandler.ListAvailable)
+	walkin.Post("/bookings", bookingHandler.Book)
 
 	addr := ":" + cfg.AppPort
 	log.Printf("listening on %s", addr)
