@@ -21,7 +21,7 @@ func NewStaffHandler(uc *usecase.StaffUsecase) *StaffHandler {
 func (h *StaffHandler) Checklist(c *fiber.Ctx) error {
 	date, err := parseMarketDate(c.Query("date"))
 	if err != nil {
-		return badRequest(c)
+		return RespondError(c, err)
 	}
 
 	items, err := h.uc.GetChecklist(c.Context(), date)

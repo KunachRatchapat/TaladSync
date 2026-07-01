@@ -57,20 +57,21 @@ func main() {
 	api := app.Group("/api")
 	api.Post("/auth/mock-login", authHandler.MockLogin)
 
-	protected := api.Group("/auth", middleware.Auth(tokenSvc))
+	authMW := middleware.Auth(tokenSvc)
+
+	protected := api.Group("/auth", authMW)
 	protected.Get("/me", authHandler.Me)
 
-	walkin := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleWalkin))
-	walkin.Get("/stalls/available", bookingHandler.ListAvailable)
-	walkin.Post("/bookings", bookingHandler.Book)
+	// อย่าใช้ api.Group("") ซ้ำกับ role middleware ต่างกัน — Fiber รวม middleware ของ group prefix ว่าง
+	// ทำให้ staff route โดน RequireRoles(WALKIN) ก่อน → 403
+	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
+	api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.Book)
 
-	regular := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleRegular))
-	regular.Post("/vendor/leave", vendorHandler.Leave)
+	api.Post("/vendor/leave", authMW, middleware.RequireRoles(domain.RoleRegular), vendorHandler.Leave)
 
-	staffGroup := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleStaff))
-	staffGroup.Get("/staff/checklist", staffHandler.Checklist)
-	staffGroup.Get("/staff/summary", staffHandler.Summary)
-	staffGroup.Post("/bookings/:id/attendance", staffHandler.MarkAttendance)
+	api.Get("/staff/checklist", authMW, middleware.RequireRoles(domain.RoleStaff), staffHandler.Checklist)
+	api.Get("/staff/summary", authMW, middleware.RequireRoles(domain.RoleStaff), staffHandler.Summary)
+	api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.RoleStaff), staffHandler.MarkAttendance)
 
 	addr := ":" + cfg.AppPort
 	log.Printf("listening on %s", addr)

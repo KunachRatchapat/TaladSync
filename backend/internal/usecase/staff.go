@@ -30,7 +30,7 @@ func (u *StaffUsecase) GetChecklist(ctx context.Context, date time.Time) ([]doma
 }
 
 func (u *StaffUsecase) GetSummary(ctx context.Context, date time.Time) (domain.AttendanceSummary, error) {
-	return u.bookings.AttendanceSummry(ctx, date)
+	return u.bookings.AttendanceSummary(ctx, date)
 }
 
 func (u *StaffUsecase) MarkAttendance(ctx context.Context, in domain.MarkAttendanceInput) (*domain.DailyBooking, error) {
