@@ -17,9 +17,13 @@ type errMapping struct {
 var errMappings = []errMapping{
 	{domain.ErrInvalidRole, fiber.StatusBadRequest, "invalid role"},
 	{domain.ErrUserNotFound, fiber.StatusNotFound, "user not found"},
+	{domain.ErrBookingNotFound, fiber.StatusNotFound, "booking not found"},
 	{domain.ErrForbidden, fiber.StatusForbidden, "forbidden"},
+	{domain.ErrNotOwnStall, fiber.StatusForbidden, "not your stall"},
 	{domain.ErrStallNotAvailable, fiber.StatusConflict, "stall is not available"},
 	{domain.ErrAlreadyHasStall, fiber.StatusConflict, "vendor already booked today"},
+	{domain.ErrLeaveNotAllowed, fiber.StatusConflict, "leave not allowed for this stall"},
+	{domain.ErrInvalidAttendanceTarget, fiber.StatusConflict, "attendance not allowed for this booking"},
 	{errUnauthorized, fiber.StatusUnauthorized, "unauthorized"},
 }
 

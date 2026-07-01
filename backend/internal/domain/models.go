@@ -27,6 +27,12 @@ const (
 	AttendanceNoShow  AttendanceStatus = "NOSHOW"
 )
 
+const (
+	AuditLeave   = "LEAVE"
+	AuditCheckin = "CHECKIN"
+	AuditNoshow  = "NOSHOW"
+)
+
 type User struct {
 	ID         uint      `gorm:"primaryKey" json:"id"`
 	NationalID string    `gorm:"uniqueIndex;size:13" json:"-"`

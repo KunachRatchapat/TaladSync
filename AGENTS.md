@@ -13,20 +13,12 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 4 done** (auth + booking: list available, book stall, 409, usecase unit test). **Session ถัดไป: code review ก่อน Phase 5**
+**สถานะรวม:** Backend — **Phase 5 done** (vendor leave + staff attendance + audit log). **Session ถัดไป: Phase 6 (directory)**
 
-### Next session (อ่านก่อนเริ่ม Phase 5)
+### Next session (อ่านก่อนเริ่ม Phase 6)
 
-Context แชทไม่ติดข้าม session — agent ใหม่อ่านไฟล์นี้ + โค้ดใน repo
-
-**ลำดับที่ต้องทำ:**
-
-1. **Code review Phase 3–4** (ก่อนเขียน Phase 5)
-   - โฟกัส: `repository/booking.go` (conditional UPDATE), `middleware/auth.go`, `handler/errors.go`, `auth/jwt.go`, `config.go` (ไม่มี secret จริง)
-   - ตรวจ: PII ไม่หลุด (`nationalId`), 409 mapping, clean architecture (usecase ไม่ import GORM)
-   - ใน Cursor: review uncommitted changes หรือ diff ตั้งแต่ Phase 3; ใช้ Bugbot / security review ได้
-2. **Commit + push** (ถ้า review ผ่านและยังไม่ push)
-3. **เริ่ม Phase 5** — vendor leave + staff attendance (ด้านล่าง)
+1. **Commit + push** Phase 4–5 changes (ถ้ายังไม่ push)
+2. **เริ่ม Phase 6** — `GET /api/directory?q=`
 
 ### Incremental roadmap
 
@@ -36,8 +28,9 @@ Context แชทไม่ติดข้าม session — agent ใหม่�
 | 1 | **DONE** | Domain models (4 tables) + Postgres connect + migrate |
 | 2 | **DONE** | Seed (users 3 roles, stalls, daily_bookings) |
 | 3 | **DONE** | Auth mock-login + JWT middleware + `GET /api/auth/me` |
-| 4 | **DONE** | Booking core — `GET /stalls/available`, `POST /bookings`, 409, usecase unit test |
-| 5 | TODO | Vendor leave + staff attendance |
+| 4 | **DONE** | Booking core — `GET /stalls/available`, `POST /bookings`, 409, partial unique index, usecase unit test |
+| 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit log |
+| 6 | TODO | Directory |
 | 6 | TODO | Directory |
 | 7 | TODO | Concurrent test (testcontainers) |
 | 8 | TODO | DevOps (docker-compose) |
@@ -46,26 +39,25 @@ Context แชทไม่ติดข้าม session — agent ใหม่�
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
-| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth + booking routes |
+| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth + booking + vendor + staff routes |
 | **config** | `backend/internal/config/config.go` | env loader (APP_PORT, DB_*, JWT_SECRET) |
-| **domain** | `backend/internal/domain/models.go`, `errors.go` | User, Stall, DailyBooking, AuditLog + business errors |
-| **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate, SeedIfEmpty |
+| **domain** | `backend/internal/domain/models.go`, `errors.go` | entities, audit constants, Leave/MarkAttendance inputs |
+| **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate (+ partial unique index), SeedIfEmpty |
 | **auth** | `backend/internal/auth/jwt.go` | TokenService Sign/Parse (HS256) |
-| **repository** | `user.go`, `booking.go` | FindByRole/FindByID; ListAvailable, TryBookStall, CountVendorBookingToday |
-| **usecase** | `auth.go`, `booking.go`, `booking_test.go` | MockLogin, GetMe; BookStall + unit test |
-| **handler** | `auth.go`, `booking.go`, `errors.go` | mock-login, /me, stalls/available, bookings |
+| **repository** | `user.go`, `booking.go`, `audit.go` | user; booking CRUD+leave+attendance; audit Create |
+| **usecase** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `*_test.go` | MockLogin; BookStall; Leave; MarkAttendance + tests |
+| **handler** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `date.go`, `errors.go` | all MVP endpoints + error mapping |
 | **middleware** | `auth.go`, `role.go` | JWT Auth, RequireRoles |
-| **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()` Asia/Bangkok |
+| **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()`, `Now()` Asia/Bangkok |
 | **env** | `backend/.env.example` | template สำหรับ dev |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
 
-### TODO (Phase 5 — หลัง code review แล้วเท่านั้น)
+### TODO (Phase 6+)
 
-1. **Vendor leave** — `POST /api/vendor/leave` (REGULAR → EXPECTED to AVAILABLE)
-2. **Staff attendance** — checklist, mark present/absent, summary + audit log
-3. **Directory** — `GET /api/directory?q=` (Phase 6)
-4. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
-5. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
+1. **Directory** — `GET /api/directory?q=` (Phase 6)
+2. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
+3. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
+4. **Seed daily bookings for today** — dev UX ข้ามวัน (optional polish)
 
 ---
 
@@ -150,11 +142,11 @@ CheckedAt        *time.Time
 | POST | `/api/auth/mock-login` | public | **DONE** | `{role}` → `{token, user}` |
 | GET | `/api/auth/me` | any JWT | **DONE** | profile จาก token |
 | GET | `/api/stalls/available?date=` | WALKIN | **DONE** | แผงว่างใน pool |
-| POST | `/api/bookings` | WALKIN | **DONE** | `{stallId, shopName, productType}` → 409 ถ้าเต็ม |
-| POST | `/api/vendor/leave` | REGULAR | TODO | `{stallId, date?}` แจ้งหยุด |
-| GET | `/api/staff/checklist?date=` | STAFF | TODO | roll-call ทุกแผงที่มีคน |
-| POST | `/api/bookings/:id/attendance` | STAFF | TODO | `{present: true/false}` |
-| GET | `/api/staff/summary?date=` | STAFF | TODO | `{present, noShow, pending, total}` |
+| POST | `/api/bookings` | WALKIN | **DONE** | `{stallId, shopName, productType, date?}` → 409 ถ้าเต็ม |
+| POST | `/api/vendor/leave` | REGULAR | **DONE** | `{stallId, date?}` แจ้งหยุด |
+| GET | `/api/staff/checklist?date=` | STAFF | **DONE** | roll-call ทุกแผงที่มีคน |
+| POST | `/api/bookings/:id/attendance` | STAFF | **DONE** | `{present: true/false}` |
+| GET | `/api/staff/summary?date=` | STAFF | **DONE** | `{present, noShow, pending, total}` |
 | GET | `/api/directory?q=` | public | TODO | ค้นหาร้าน (ไม่มี PII) |
 
 ## การรัน (dev)
@@ -189,10 +181,24 @@ Header: `Authorization: Bearer <token>`
 ```
 1. POST /api/auth/mock-login  { "role": "WALKIN" }
 2. GET  /api/stalls/available?date=YYYY-MM-DD   (Bearer token)
-3. POST /api/bookings  { "stallId": 13, "shopName": "ร้านทด", "productType": "ผลไม้" }
+3. POST /api/bookings  { "stallId": 13, "shopName": "ร้านทด", "productType": "ผลไม้", "date": "YYYY-MM-DD" }
 ```
 
-Unit test: `go test ./internal/usecase/... -v -run BookStall`
+Unit test: `go test ./internal/usecase/... -v`
+
+## Phase 5 smoke test
+
+```
+# REGULAR leave
+POST /api/auth/mock-login  { "role": "REGULAR" }
+POST /api/vendor/leave     { "stallId": 1, "date": "YYYY-MM-DD" }
+
+# STAFF roll-call
+POST /api/auth/mock-login  { "role": "STAFF" }
+GET  /api/staff/checklist?date=YYYY-MM-DD
+POST /api/bookings/:id/attendance  { "present": true }
+GET  /api/staff/summary?date=YYYY-MM-DD
+```
 
 ## Phase 2 (ยังไม่ทำ)
 

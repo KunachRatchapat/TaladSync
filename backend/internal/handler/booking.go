@@ -1,13 +1,10 @@
 package handler
 
 import (
-	"time"
-
 	"github.com/gofiber/fiber/v2"
 
 	"taladsync/internal/domain"
 	"taladsync/internal/middleware"
-	"taladsync/internal/pkg/timeutil"
 	"taladsync/internal/usecase"
 )
 
@@ -69,15 +66,4 @@ func (h *BookingHandler) Book(c *fiber.Ctx) error {
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "booked"})
-}
-
-func parseMarketDate(raw string) (time.Time, error) {
-	if raw == "" {
-		return timeutil.Today(), nil
-	}
-	t, err := time.Parse("2006-01-02", raw)
-	if err != nil {
-		return time.Time{}, err
-	}
-	return timeutil.MarketDate(t), nil
 }

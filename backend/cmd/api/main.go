@@ -40,6 +40,12 @@ func main() {
 	bookingUC := usecase.NewBookingUsecase(bookingRepo)
 	bookingHandler := handler.NewBookingHandler(bookingUC)
 
+	auditRepo := repository.NewAuditRepository(db)
+	vendorUC := usecase.NewVendorUsecase(bookingRepo, auditRepo)
+	vendorHandler := handler.NewVendorHandler(vendorUC)
+	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
+	staffHandler := handler.NewStaffHandler(staffUC)
+
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
@@ -57,6 +63,14 @@ func main() {
 	walkin := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleWalkin))
 	walkin.Get("/stalls/available", bookingHandler.ListAvailable)
 	walkin.Post("/bookings", bookingHandler.Book)
+
+	regular := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleRegular))
+	regular.Post("/vendor/leave", vendorHandler.Leave)
+
+	staffGroup := api.Group("", middleware.Auth(tokenSvc), middleware.RequireRoles(domain.RoleStaff))
+	staffGroup.Get("/staff/checklist", staffHandler.Checklist)
+	staffGroup.Get("/staff/summary", staffHandler.Summary)
+	staffGroup.Post("/bookings/:id/attendance", staffHandler.MarkAttendance)
 
 	addr := ":" + cfg.AppPort
 	log.Printf("listening on %s", addr)

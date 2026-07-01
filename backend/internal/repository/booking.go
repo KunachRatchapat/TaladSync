@@ -66,6 +66,120 @@ func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorI
 	return count, err
 }
 
+func (r *BookingRepository) GetByStallAndDate(ctx context.Context, stallID uint, date time.Time) (*domain.DailyBooking, error) {
+	date = timeutil.MarketDate(date)
+	var booking domain.DailyBooking
+	err := r.db.WithContext(ctx).
+		Preload("Stall").
+		Where("stall_id = ? AND market_date = ?", stallID, date).
+		First(&booking).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrBookingNotFound
+		}
+		return nil, err
+	}
+	return &booking, nil
+}
+
+func (r *BookingRepository) TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error) {
+	date := timeutil.MarketDate(in.MarketDate)
+	res := r.db.WithContext(ctx).
+		Model(&domain.DailyBooking{}).
+		Where("stall_id = ? AND market_date = ? AND status = ? AND vendor_id = ?",
+			in.StallID, date, domain.StatusExpected, in.VendorID).
+		Updates(map[string]interface{}{
+			"status":       domain.StatusAvailable,
+			"vendor_id":    nil,
+			"shop_name":    "",
+			"product_type": "",
+		})
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	return res.RowsAffected, nil
+}
+
+//เอาไว้หา booking ตาม id
+func (r *BookingRepository) FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error) {
+	var booking domain.DailyBooking
+	err := r.db.WithContext(ctx).Preload("Stall").First(&booking, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, domain.ErrBookingNotFound
+		}
+		return nil, err
+	}
+	return &booking, nil
+}
+
+func (r *BookingRepository) ListChecklist(ctx context.Context, date time.Time) ([]domain.DailyBooking, error) {
+	date = timeutil.MarketDate(date)
+	var bookings []domain.DailyBooking
+	err := r.db.WithContext(ctx).
+		Preload("Stall").
+		Where("market_date = ? AND status IN ?",
+			date, []domain.BookingStatus{domain.StatusExpected, domain.StatusBooked}).
+		Order("stall_id ASC").
+		Find(&bookings).Error
+	if err != nil {
+		return nil, err
+	}
+	return bookings, nil
+}
+
+//เช็คว่ามาไหม
+func (r *BookingRepository) SetAttendance(
+	ctx context.Context,
+	bookingID, staffID uint,
+	attendance domain.AttendanceStatus,
+	checkedAt time.Time,
+) (int64, error) {
+	res := r.db.WithContext(ctx).
+		Model(&domain.DailyBooking{}).
+		Where("id = ? AND attendance != ?", bookingID, attendance).
+		Updates(map[string]interface{}{
+			"attendance":           attendance,
+			"checked_by_staff_id": staffID,
+			"checked_at":           checkedAt,
+		})
+	return res.RowsAffected, res.Error
+}
+
+func (r *BookingRepository) AttendanceSummary(ctx context.Context, date time.Time) (domain.AttendanceSummary, error) {
+	date = timeutil.MarketDate(date)
+	statuses := []domain.BookingStatus{domain.StatusExpected, domain.StatusBooked}
+
+	type row struct {
+		Attendance domain.AttendanceStatus
+		Count      int64
+	}
+	var rows []row
+	err := r.db.WithContext(ctx).
+		Model(&domain.DailyBooking{}).
+		Select("attendance, count(*) as count").
+		Where("market_date = ? AND status IN ?", date, statuses).
+		Group("attendance").
+		Scan(&rows).Error
+	if err != nil {
+		return domain.AttendanceSummary{}, err
+	}
+
+	var summary domain.AttendanceSummary
+	for _, row := range rows {
+		summary.Total += row.Count
+		switch row.Attendance {
+		case domain.AttendancePresent:
+			summary.Present = row.Count
+		case domain.AttendanceNoShow:
+			summary.NoShow = row.Count
+		case domain.AttendancePending:
+			summary.Pending = row.Count
+		}
+	}
+	return summary, nil
+}
+
 func isDuplicateKey(err error) bool {
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return true
