@@ -13,12 +13,12 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 6 done** (directory search public API). **Session ถัดไป: Phase 7 (concurrent test)**
+**สถานะรวม:** Backend — **Phase 7 done** (concurrent booking integration test). **Session ถัดไป: Phase 8 (docker-compose)**
 
-### Next session (อ่านก่อนเริ่ม Phase 7)
+### Next session (อ่านก่อนเริ่ม Phase 8)
 
-1. **Commit + push** Phase 6 (ถ้ายังไม่ push)
-2. **เริ่ม Phase 7** — concurrent test ด้วย testcontainers (50 goroutines, 1 winner)
+1. **Commit + push** Phase 7 (ถ้ายังไม่ push)
+2. **เริ่ม Phase 8** — `docker-compose.yml` + README polish
 3. Optional polish: seed `daily_bookings` สำหรับวันนี้เมื่อข้ามวัน (dev UX)
 
 ### Incremental roadmap
@@ -32,7 +32,7 @@
 | 4 | **DONE** | Booking — list/book, 409, `date?` body, partial unique index (1 vendor/วัน), unit tests |
 | 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit (LEAVE/CHECKIN/NOSHOW) |
 | 6 | **DONE** | Directory — `GET /api/directory?q=` public, ไม่มี PII |
-| 7 | TODO | Concurrent test (testcontainers) |
+| 7 | **DONE** | Concurrent test — 50 goroutines, 1 winner (`-tags=integration`) |
 | 8 | TODO | DevOps (docker-compose) |
 
 ### DONE (มีไฟล์แล้ว)
@@ -45,19 +45,18 @@
 | **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate (+ partial unique index), SeedIfEmpty |
 | **auth** | `backend/internal/auth/jwt.go` | TokenService Sign/Parse (HS256) |
 | **repository** | `user.go`, `booking.go`, `audit.go` | user; booking CRUD+leave+attendance+SearchDirectory; audit Create |
-| **usecase** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `*_test.go` | MockLogin; BookStall; Leave; MarkAttendance; Search + tests |
+| **usecase** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `*_test.go`, `booking_concurrent_test.go` | MockLogin; BookStall; Leave; MarkAttendance; Search + unit/integration tests |
 | **handler** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `date.go`, `errors.go` | all MVP endpoints + error mapping |
 | **middleware** | `auth.go`, `role.go` | JWT Auth, RequireRoles |
 | **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()`, `Now()` Asia/Bangkok |
 | **env** | `backend/.env.example` | template สำหรับ dev |
-| **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
+| **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5, testcontainers-go |
 
-### TODO (Phase 7+)
+### TODO (Phase 8+)
 
-1. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
-2. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
-3. **Seed daily bookings for today** — dev UX ข้ามวัน (optional)
-4. **BOOK audit** — retroactive `audit_logs` ตอนจอง (optional polish)
+1. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
+2. **Seed daily bookings for today** — dev UX ข้ามวัน (optional)
+3. **BOOK audit** — retroactive `audit_logs` ตอนจอง (optional polish)
 
 ---
 
@@ -241,6 +240,22 @@ GET /api/directory?q=ร้านA-01&date=YYYY-MM-DD
 Response: `{"results":[{"stallCode","zone","shopName","productType","posX","posY"}]}`
 
 Unit test: `go test ./internal/usecase/... -v -run Search_`
+
+## Phase 7 concurrent test (integration)
+
+พิสูจน์ conditional UPDATE กัน double-booking — **ต้อง Docker Desktop รันอยู่**
+
+```powershell
+cd backend
+
+# unit tests ปกติ (ไม่ต้อง Docker)
+go test ./internal/usecase/... -v
+
+# killer demo — 50 goroutines จองแผงเดียว, assert 1 winner
+go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
+```
+
+ถ้า Docker ไม่พร้อม test จะ **skip** (ไม่ fail) พร้อมข้อความให้เปิด Docker Desktop
 
 ## Phase 2 (ยังไม่ทำ)
 
