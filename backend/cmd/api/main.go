@@ -46,6 +46,9 @@ func main() {
 	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
 	staffHandler := handler.NewStaffHandler(staffUC)
 
+	directoryUC := usecase.NewDirectoryUsecase(bookingRepo)
+	directoryHandler := handler.NewDirectoryHandler(directoryUC)
+
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
@@ -57,13 +60,14 @@ func main() {
 	api := app.Group("/api")
 	api.Post("/auth/mock-login", authHandler.MockLogin)
 
+	api.Get("/directory", directoryHandler.Search)
+
 	authMW := middleware.Auth(tokenSvc)
 
 	protected := api.Group("/auth", authMW)
 	protected.Get("/me", authHandler.Me)
 
-	// อย่าใช้ api.Group("") ซ้ำกับ role middleware ต่างกัน — Fiber รวม middleware ของ group prefix ว่าง
-	// ทำให้ staff route โดน RequireRoles(WALKIN) ก่อน → 403
+
 	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
 	api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.Book)
 

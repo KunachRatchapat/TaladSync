@@ -13,12 +13,13 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 5 done** (vendor leave + staff attendance + audit log). **Session ถัดไป: Phase 6 (directory)**
+**สถานะรวม:** Backend — **Phase 6 done** (directory search public API). **Session ถัดไป: Phase 7 (concurrent test)**
 
-### Next session (อ่านก่อนเริ่ม Phase 6)
+### Next session (อ่านก่อนเริ่ม Phase 7)
 
-1. **Commit + push** Phase 4–5 changes (ถ้ายังไม่ push)
-2. **เริ่ม Phase 6** — `GET /api/directory?q=`
+1. **Commit + push** Phase 6 (ถ้ายังไม่ push)
+2. **เริ่ม Phase 7** — concurrent test ด้วย testcontainers (50 goroutines, 1 winner)
+3. Optional polish: seed `daily_bookings` สำหรับวันนี้เมื่อข้ามวัน (dev UX)
 
 ### Incremental roadmap
 
@@ -28,10 +29,9 @@
 | 1 | **DONE** | Domain models (4 tables) + Postgres connect + migrate |
 | 2 | **DONE** | Seed (users 3 roles, stalls, daily_bookings) |
 | 3 | **DONE** | Auth mock-login + JWT middleware + `GET /api/auth/me` |
-| 4 | **DONE** | Booking core — `GET /stalls/available`, `POST /bookings`, 409, partial unique index, usecase unit test |
-| 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit log |
-| 6 | TODO | Directory |
-| 6 | TODO | Directory |
+| 4 | **DONE** | Booking — list/book, 409, `date?` body, partial unique index (1 vendor/วัน), unit tests |
+| 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit (LEAVE/CHECKIN/NOSHOW) |
+| 6 | **DONE** | Directory — `GET /api/directory?q=` public, ไม่มี PII |
 | 7 | TODO | Concurrent test (testcontainers) |
 | 8 | TODO | DevOps (docker-compose) |
 
@@ -39,27 +39,48 @@
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
-| **entrypoint** | `backend/cmd/api/main.go` | Fiber + DB + auth + booking + vendor + staff routes |
+| **entrypoint** | `backend/cmd/api/main.go` | Fiber routes — **middleware ต่อ route** (ดูด้านล่าง) |
 | **config** | `backend/internal/config/config.go` | env loader (APP_PORT, DB_*, JWT_SECRET) |
-| **domain** | `backend/internal/domain/models.go`, `errors.go` | entities, audit constants, Leave/MarkAttendance inputs |
+| **domain** | `backend/internal/domain/models.go`, `errors.go` | entities, audit constants, inputs, `DirectoryEntry` DTO |
 | **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate (+ partial unique index), SeedIfEmpty |
 | **auth** | `backend/internal/auth/jwt.go` | TokenService Sign/Parse (HS256) |
-| **repository** | `user.go`, `booking.go`, `audit.go` | user; booking CRUD+leave+attendance; audit Create |
-| **usecase** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `*_test.go` | MockLogin; BookStall; Leave; MarkAttendance + tests |
-| **handler** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `date.go`, `errors.go` | all MVP endpoints + error mapping |
+| **repository** | `user.go`, `booking.go`, `audit.go` | user; booking CRUD+leave+attendance+SearchDirectory; audit Create |
+| **usecase** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `*_test.go` | MockLogin; BookStall; Leave; MarkAttendance; Search + tests |
+| **handler** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `date.go`, `errors.go` | all MVP endpoints + error mapping |
 | **middleware** | `auth.go`, `role.go` | JWT Auth, RequireRoles |
 | **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()`, `Now()` Asia/Bangkok |
 | **env** | `backend/.env.example` | template สำหรับ dev |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5 |
 
-### TODO (Phase 6+)
+### TODO (Phase 7+)
 
-1. **Directory** — `GET /api/directory?q=` (Phase 6)
-2. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
-3. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
-4. **Seed daily bookings for today** — dev UX ข้ามวัน (optional polish)
+1. **Concurrent test** — 50 goroutines, assert 1 winner (Phase 7)
+2. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
+3. **Seed daily bookings for today** — dev UX ข้ามวัน (optional)
+4. **BOOK audit** — retroactive `audit_logs` ตอนจอง (optional polish)
 
 ---
+
+## Route wiring (`cmd/api/main.go`) — สำคัญ
+
+**อย่าใช้ `api.Group("")` หลายครั้งพร้อม `RequireRoles` คนละ role** — Fiber รวม middleware ของ group prefix ว่าง ทำให้ staff route โดน `RequireRoles(WALKIN)` → **403 forbidden**
+
+รูปแบบที่ใช้ตอนนี้:
+
+```go
+authMW := middleware.Auth(tokenSvc)
+
+api.Get("/directory", directoryHandler.Search)  // public — ไม่มี authMW
+
+api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
+api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
+api.Post("/vendor/leave", authMW, middleware.RequireRoles(domain.RoleRegular), ...)
+api.Get("/staff/checklist", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
+api.Get("/staff/summary", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
+api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
+```
+
+`/api/auth/me` ใช้ group แยก `api.Group("/auth", authMW)` — ไม่มี RequireRoles
 
 ## Tech Stack
 
@@ -73,16 +94,16 @@
 **Dependency rule:** ลูกศรชี้เข้าด้านใน `handler → usecase → domain` ; `repository` implement interface ของ `usecase`
 
 ```
-cmd/api/main.go          ← DONE (health + auth + booking)
+cmd/api/main.go          ← DONE (health + auth + booking + vendor + staff + directory)
 internal/
   config/                ← DONE
-  domain/                ← DONE
-  database/              ← DONE (connect + migrate + seed)
-  pkg/timeutil/          ← DONE
+  domain/                ← DONE (models, errors, inputs, DirectoryEntry)
+  database/              ← DONE (connect + migrate + seed + idx_vendor_one_booked_per_day)
+  pkg/timeutil/          ← DONE (Today, Now, MarketDate)
   auth/                  ← DONE (JWT)
-  repository/            ← DONE (user, booking)
-  usecase/               ← DONE (auth, booking + unit test)
-  handler/               ← DONE (auth, booking)
+  repository/            ← DONE (user, booking, audit)
+  usecase/               ← DONE (auth, booking, vendor, staff, directory + tests)
+  handler/               ← DONE (auth, booking, vendor, staff, directory, date, errors)
   middleware/            ← DONE (Auth, RequireRoles)
 ```
 
@@ -102,6 +123,7 @@ WHERE stall_id = ? AND market_date = ? AND status = 'AVAILABLE';
 - `RowsAffected = 0` → `ErrStallNotAvailable` (HTTP 409)
 - **ห้าม** ทำ I/O ภายนอก (LINE push) ใน transaction ที่ถือ row lock
 - Double-booking กันสองชั้น: conditional `WHERE` + `UNIQUE(stall_id, market_date)`
+- 1 ขาจร 1 แผง/วัน: partial unique index `idx_vendor_one_booked_per_day` บน `(vendor_id, market_date) WHERE status='BOOKED'`
 
 ## State Machine
 
@@ -132,7 +154,8 @@ CheckedAt        *time.Time
 - Business error อยู่ใน `internal/domain/errors.go`; **handler** เป็นที่เดียวที่ map → HTTP status
 - `national_id` = PII: ห้าม return ออก public API (`json:"-"`); production ต้อง encrypt
 - Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
-- Audit: `CHECKIN`, `NOSHOW`, `BOOK`, `LEAVE` → `audit_logs`
+- Audit: `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` (MVP; `BOOK` ยังไม่เขียน)
+- `parseMarketDate` ใน `handler/date.go` — query/body `date` ว่าง = วันนี้ Bangkok; ใช้ร่วม list/book/leave/checklist
 
 ## API (MVP — implemented vs TODO)
 
@@ -147,24 +170,23 @@ CheckedAt        *time.Time
 | GET | `/api/staff/checklist?date=` | STAFF | **DONE** | roll-call ทุกแผงที่มีคน |
 | POST | `/api/bookings/:id/attendance` | STAFF | **DONE** | `{present: true/false}` |
 | GET | `/api/staff/summary?date=` | STAFF | **DONE** | `{present, noShow, pending, total}` |
-| GET | `/api/directory?q=` | public | TODO | ค้นหาร้าน (ไม่มี PII) |
+| GET | `/api/directory?q=` | public | **DONE** | ค้นหาร้าน (ไม่มี PII) — `?date=` optional |
 
 ## การรัน (dev)
 
 ```powershell
-
 copy backend\.env.example backend\.env
 
-
-# 2. สร้าง database (ครั้งแรก)
+# สร้าง database (ครั้งแรก)
 createdb -U postgres taladsync
 
-# 3. รัน API (seed อัตโนมัติถ้า users ว่าง)
+# รัน API (seed อัตโนมัติถ้า users ว่าง)
 cd backend
 go run ./cmd/api
-# GET http://localhost:8080/health  →  {"status":"ok"}
-# log: "seed complete: 3 users, 20 stalls, 20 daily_bookings ..."
+# GET http://localhost:8080/health → {"status":"ok"}
 ```
+
+**หมายเหตุ dev:** seed สร้าง `daily_bookings` แค่วันที่ seed ครั้งแรก — query `?date=` / body `date` ต้องตรงวันใน DB (หรือ reset DB / รอ seed-today polish)
 
 ## Mock Login (ทดสอบ)
 
@@ -188,17 +210,37 @@ Unit test: `go test ./internal/usecase/... -v`
 
 ## Phase 5 smoke test
 
+ใช้ `YYYY-MM-DD` ตรงกับ `market_date` ใน DB (ดูด้วย `SELECT DISTINCT market_date FROM daily_bookings`)
+
 ```
-# REGULAR leave
+# REGULAR แจ้งหยุด (stallId = แผง A-01..A-12, ไม่ใช่ daily_bookings.id)
 POST /api/auth/mock-login  { "role": "REGULAR" }
 POST /api/vendor/leave     { "stallId": 1, "date": "YYYY-MM-DD" }
 
-# STAFF roll-call
+# WALKIN ดู pool หลัง leave
+POST /api/auth/mock-login  { "role": "WALKIN" }
+GET  /api/stalls/available?date=YYYY-MM-DD
+
+# STAFF roll-call (:id = daily_bookings.id จาก checklist ไม่ใช่ stallId)
 POST /api/auth/mock-login  { "role": "STAFF" }
 GET  /api/staff/checklist?date=YYYY-MM-DD
 POST /api/bookings/:id/attendance  { "present": true }
 GET  /api/staff/summary?date=YYYY-MM-DD
 ```
+
+## Phase 6 smoke test
+
+ใช้ `YYYY-MM-DD` ตรงกับ `market_date` ใน DB (ดูด้วย `SELECT DISTINCT market_date FROM daily_bookings`) — **ไม่ต้อง JWT**
+
+```
+GET /api/directory?q=ของสด&date=YYYY-MM-DD
+GET /api/directory?date=YYYY-MM-DD          # q ว่าง = list ทุกร้านวันนั้น
+GET /api/directory?q=ร้านA-01&date=YYYY-MM-DD
+```
+
+Response: `{"results":[{"stallCode","zone","shopName","productType","posX","posY"}]}`
+
+Unit test: `go test ./internal/usecase/... -v -run Search_`
 
 ## Phase 2 (ยังไม่ทำ)
 

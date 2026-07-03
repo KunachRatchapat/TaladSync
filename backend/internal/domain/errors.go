@@ -43,3 +43,12 @@ type AttendanceSummary struct {
 	Pending int64
 	Total   int64
 }
+
+type DirectoryEntry struct {
+	StallCode   string  `json:"stallCode"`
+	Zone        string  `json:"zone"`
+	ShopName    string  `json:"shopName"`
+	ProductType string  `json:"productType"`
+	PosX        float64 `json:"posX"`
+	PosY        float64 `json:"posY"`
+}

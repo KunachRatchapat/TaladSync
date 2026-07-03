@@ -146,6 +146,41 @@ func (r *BookingRepository) SetAttendance(
 	return res.RowsAffected, res.Error
 }
 
+func (r *BookingRepository) SearchDirectory(ctx context.Context, date time.Time, q string) ([]domain.DirectoryEntry, error) {
+	date = timeutil.MarketDate(date)
+	statuses := []domain.BookingStatus{domain.StatusExpected, domain.StatusBooked}
+
+	query := r.db.WithContext(ctx).
+		Preload("Stall").
+		Where("market_date = ? AND status IN ? AND shop_name != ''", date, statuses)
+
+	if q != "" {
+		pattern := "%" + q + "%"
+		query = query.Where("shop_name ILIKE ? OR product_type ILIKE ?", pattern, pattern)
+	}
+
+	var bookings []domain.DailyBooking
+	if err := query.Order("stall_id ASC").Find(&bookings).Error; err != nil {
+		return nil, err
+	}
+
+	entries := make([]domain.DirectoryEntry, 0, len(bookings))
+	for _, b := range bookings {
+		if b.Stall == nil {
+			continue
+		}
+		entries = append(entries, domain.DirectoryEntry{
+			StallCode:   b.Stall.Code,
+			Zone:        b.Stall.Zone,
+			ShopName:    b.ShopName,
+			ProductType: b.ProductType,
+			PosX:        b.Stall.PosX,
+			PosY:        b.Stall.PosY,
+		})
+	}
+	return entries, nil
+}
+
 func (r *BookingRepository) AttendanceSummary(ctx context.Context, date time.Time) (domain.AttendanceSummary, error) {
 	date = timeutil.MarketDate(date)
 	statuses := []domain.BookingStatus{domain.StatusExpected, domain.StatusBooked}
