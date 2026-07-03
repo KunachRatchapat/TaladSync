@@ -13,13 +13,41 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend — **Phase 7 done** (concurrent booking integration test). **Session ถัดไป: Phase 8 (docker-compose)**
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE** — **ยังไม่ commit/push Phase 8** (Dockerfile, compose, `.env.example`)
 
-### Next session (อ่านก่อนเริ่ม Phase 8)
+### Next session (อ่านก่อนเริ่ม)
 
-1. **Commit + push** Phase 7 (ถ้ายังไม่ push)
-2. **เริ่ม Phase 8** — `docker-compose.yml` + README polish
-3. Optional polish: seed `daily_bookings` สำหรับวันนี้เมื่อข้ามวัน (dev UX)
+1. **Commit + push** Phase 8 ถ้ายังไม่ push (ดูรายการไฟล์ด้านล่าง)
+2. **เลือกทางต่อ:** Frontend Vue 3 **หรือ** Product Phase 2 (LINE LIFF, seed-today, BOOK audit)
+3. Optional: `SeedDailyBookingsForToday()` — dev UX ข้ามวัน
+
+### Phase 8 ที่ทำแล้ว (session ล่าสุด)
+
+| ไฟล์ | งาน |
+|------|-----|
+| [`docker-compose.yml`](docker-compose.yml) | `postgres:17-alpine` + `api` (build `./backend`), healthcheck, volume `pgdata` |
+| [`backend/Dockerfile`](backend/Dockerfile) | multi-stage Go 1.24 → alpine, `TZ=Asia/Bangkok` |
+| [`backend/.dockerignore`](backend/.dockerignore) | กัน `.env`, binaries |
+| [`.env.example`](.env.example) | template secrets สำหรับ compose — **commit ได้** |
+| `.env` (root) | 
+
+**Secrets:** `docker-compose.yml` ใช้ `${POSTGRES_PASSWORD}`, `${JWT_SECRET}` จาก `.env` — 
+
+**สองไฟล์ env แยกกัน:**
+
+| ไฟล์ | ใช้เมื่อ |
+|------|---------|
+| `D:\taladsync\.env` | `docker compose up` |
+| `backend\.env` | `go run ./cmd/api` |
+
+
+
+### Pitfalls Docker (สำคัญ)
+
+- **เปลี่ยน `POSTGRES_PASSWORD` หลัง volume สร้างแล้ว** → auth fail (`SQLSTATE 28P01`) — Postgres ไม่ re-init รหัส  
+  **แก้:** `docker compose down -v` แล้ว `up --build` ใหม่ (ลบข้อมูล DB ใน volume)
+- Port `5432` / `8080` ชนกับ Postgres local หรือ `go run` — หยุดก่อน
+- Seed ใน container ครั้งแรกเท่านั้น — `market_date` = วันที่ seed (ดู log `seed complete ... for YYYY-MM-DD`)
 
 ### Incremental roadmap
 
@@ -33,13 +61,14 @@
 | 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit (LEAVE/CHECKIN/NOSHOW) |
 | 6 | **DONE** | Directory — `GET /api/directory?q=` public, ไม่มี PII |
 | 7 | **DONE** | Concurrent test — 50 goroutines, 1 winner (`-tags=integration`) |
-| 8 | TODO | DevOps (docker-compose) |
+| 8 | **DONE** | DevOps — compose + Dockerfile + `.env.example` (secrets นอก repo) |
 
 ### DONE (มีไฟล์แล้ว)
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
 | **entrypoint** | `backend/cmd/api/main.go` | Fiber routes — **middleware ต่อ route** (ดูด้านล่าง) |
+| **devops** | `docker-compose.yml`, `backend/Dockerfile`, `backend/.dockerignore`, `.env.example` | Postgres 17 + API; secrets ใน `.env` |
 | **config** | `backend/internal/config/config.go` | env loader (APP_PORT, DB_*, JWT_SECRET) |
 | **domain** | `backend/internal/domain/models.go`, `errors.go` | entities, audit constants, inputs, `DirectoryEntry` DTO |
 | **database** | `backend/internal/database/database.go`, `seed.go` | Connect, Migrate (+ partial unique index), SeedIfEmpty |
@@ -49,14 +78,14 @@
 | **handler** | `auth.go`, `booking.go`, `vendor.go`, `staff.go`, `directory.go`, `date.go`, `errors.go` | all MVP endpoints + error mapping |
 | **middleware** | `auth.go`, `role.go` | JWT Auth, RequireRoles |
 | **timeutil** | `backend/internal/pkg/timeutil/market_date.go` | `Today()`, `Now()` Asia/Bangkok |
-| **env** | `backend/.env.example` | template สำหรับ dev |
+| **env** | `backend/.env.example`, `.env.example` (root) | local dev vs docker compose |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5, testcontainers-go |
 
-### TODO (Phase 8+)
+### TODO (optional polish)
 
-1. **DevOps** — `docker-compose.yml`, README polish (Phase 8)
-2. **Seed daily bookings for today** — dev UX ข้ามวัน (optional)
-3. **BOOK audit** — retroactive `audit_logs` ตอนจอง (optional polish)
+1. **Seed daily bookings for today** — dev UX ข้ามวัน
+2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
+3. **Frontend Vue 3** — vendor grab UI, staff checklist, customer map
 
 ---
 
@@ -173,6 +202,20 @@ CheckedAt        *time.Time
 
 ## การรัน (dev)
 
+### Docker Compose (full stack)
+
+```powershell
+copy .env.example .env
+# แก้ POSTGRES_PASSWORD, JWT_SECRET ใน .env (ไม่ commit .env)
+
+docker compose up --build
+# GET http://localhost:8080/health → {"status":"ok"}
+```
+
+หยุด local Postgres/API ก่อนถ้า port `5432` / `8080` ชน — reset volume: `docker compose down -v`
+
+### Local (go run)
+
 ```powershell
 copy backend\.env.example backend\.env
 
@@ -257,7 +300,27 @@ go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
 
 ถ้า Docker ไม่พร้อม test จะ **skip** (ไม่ fail) พร้อมข้อความให้เปิด Docker Desktop
 
-## Phase 2 (ยังไม่ทำ)
+## Phase 8 Docker Compose
+
+```powershell
+# จาก repo root
+copy .env.example .env
+# แก้ POSTGRES_PASSWORD, JWT_SECRET
+
+docker compose up --build
+# GET http://localhost:8080/health → {"status":"ok"}
+```
+
+```powershell
+docker compose down          # หยุด
+docker compose down -v       # หยุด + ลบ volume (reset DB / แก้รหัสผ่าน PG)
+docker compose up --build -d # รัน background
+docker compose logs -f api   # ดู log
+```
+
+**Verify แล้ว:** build ผ่าน, seed อัตโนมัติ, health OK
+
+## Phase 2 / Frontend (ถัดไป — ยังไม่ทำ)
 
 - LINE LIFF / Push จริง (Flash Drop)
 - โควตาวันหยุด, แจ้งหยุดฉุกเฉิน 2 ครั้ง/เดือน, ลาพักยาว+อนุมัติ

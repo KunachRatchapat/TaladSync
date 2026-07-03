@@ -11,9 +11,9 @@ A daily fresh-market stall management system that solves two core pain points:
 
 ## 🚧 Project Status
 
-> **Phase 4 done.** Auth (mock-login, JWT, `/api/auth/me`) + booking (`GET /stalls/available`, `POST /bookings`, HTTP 409). Usecase unit tests for `BookStall`.
-> Vendor leave, staff roll-call, directory, concurrent test, and Docker — not yet implemented.
-> See the incremental roadmap in [`AGENTS.md`](AGENTS.md).
+> **Backend MVP complete (Phase 0–8).** All API endpoints, unit tests, concurrent integration test, and Docker Compose are implemented.
+> **Phase 8 not yet committed** — see file list in [`AGENTS.md`](AGENTS.md).
+> Frontend (Vue 3) is not started — see Product Phase 2 below.
 
 ---
 
@@ -39,20 +39,18 @@ handler → usecase → domain
 ```
 
 ```
-backend/
-├── .env.example
-├── cmd/api/main.go          # entrypoint
-└── internal/
-    ├── auth/                # JWT Sign/Parse
-    ├── config/              # env loading
-    ├── domain/              # models + business errors
-    ├── database/            # connect + migrate + seed
-    ├── handler/             # auth, booking HTTP
-    ├── middleware/          # JWT auth, RequireRoles
-    ├── repository/          # user, booking (GORM)
-    ├── usecase/             # auth, booking + unit tests
-    └── pkg/timeutil/        # market_date (Asia/Bangkok)
+taladsync/
+├── .env.example             # Docker Compose secrets template (copy → .env)
+├── docker-compose.yml       # Postgres 17 + API
+└── backend/
+    ├── Dockerfile
+    ├── .dockerignore
+    ├── .env.example         # local go run (copy → backend/.env)
+    ├── cmd/api/main.go
+    └── internal/ ...
 ```
+
+**Two env files:** root `.env` for Docker; `backend/.env` for `go run` — keep `JWT_SECRET` in sync if using both.
 
 ---
 
@@ -83,15 +81,35 @@ More detail: [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md)
 | GET | `/api/auth/me` | JWT | ✅ |
 | GET | `/api/stalls/available?date=` | WALKIN | ✅ |
 | POST | `/api/bookings` | WALKIN | ✅ |
-| POST | `/api/vendor/leave` | REGULAR | — |
-| GET | `/api/staff/checklist?date=` | STAFF | — |
-| POST | `/api/bookings/:id/attendance` | STAFF | — |
-| GET | `/api/staff/summary?date=` | STAFF | — |
-| GET | `/api/directory?q=` | public | — |
+| POST | `/api/vendor/leave` | REGULAR | ✅|
+| GET | `/api/staff/checklist?date=` | STAFF | ✅|
+| POST | `/api/bookings/:id/attendance` | STAFF | ✅ |
+| GET | `/api/staff/summary?date=` | STAFF | ✅ |
+| GET | `/api/directory?q=` | public | ✅ |
 
 ---
 
-## 🚀 Running (dev)
+## 🚀 Running
+
+### Option A: Docker Compose (full stack)
+
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/). Stop local Postgres/API if ports `5432` / `8080` are already in use.
+
+```powershell
+copy .env.example .env
+# Edit .env — set POSTGRES_PASSWORD and JWT_SECRET (do not commit .env)
+
+docker compose up --build
+# GET http://localhost:8080/health  →  {"status":"ok"}
+# First run auto-seeds users, stalls, daily_bookings
+```
+
+Stop: `docker compose down`  
+Reset DB (e.g. after changing `POSTGRES_PASSWORD`): `docker compose down -v` then `up --build` again
+
+**Troubleshooting:** `password authentication failed for user "postgres"` — volume was initialized with an old password. Run `docker compose down -v` and start fresh, or set `.env` password to match the existing volume.
+
+### Option B: Local dev (go run)
 
 ```powershell
 # 1. Set up environment
@@ -133,7 +151,12 @@ Returns `201` on success, `409` if the stall was taken or vendor already booked 
 
 ```powershell
 cd backend
-go test ./internal/usecase/... -v -run BookStall
+
+# unit tests (no Docker)
+go test ./internal/usecase/... -v
+
+# concurrent integration test (requires Docker)
+go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
 ```
 
 ---
@@ -153,10 +176,14 @@ go test ./internal/usecase/... -v -run BookStall
 | 0–2 | ✅ | Health, schema, seed |
 | 3 | ✅ | Auth (mock-login, JWT, `/me`) |
 | 4 | ✅ | Booking (list + book + 409) |
-| 5 | — | Vendor leave + staff attendance |
-| 6 | — | Customer directory |
-| 7 | — | Concurrent load test (testcontainers) |
-| 8 | — | Docker Compose |
+| 5 | ✅ | Vendor leave + staff attendance |
+| 6 | ✅ | Customer directory |
+| 7 | ✅ | Concurrent load test (testcontainers) |
+| 8 | ✅ | Docker Compose (Postgres + API, secrets via `.env`) |
+
+### Phase 8 files (pending commit)
+
+- `docker-compose.yml`, `backend/Dockerfile`, `backend/.dockerignore`, `.env.example`
 
 ## 🗺 Product Phase 2 (later)
 
