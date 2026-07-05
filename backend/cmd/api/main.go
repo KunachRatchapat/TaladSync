@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
@@ -30,6 +31,9 @@ func main() {
 	if err := database.SeedIfEmpty(db); err != nil {
 		log.Fatal(err)
 	}
+	if err := database.SeedDailyBookingsForToday(db); err != nil {
+		log.Fatal(err)
+	}
 
 	userRepo := repository.NewUserRepository(db)
 	tokenSvc := auth.NewTokenService([]byte(cfg.JWTSecret))
@@ -52,6 +56,11 @@ func main() {
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: cfg.CORSOrigins,
+		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
+		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
+	}))
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

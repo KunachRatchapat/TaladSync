@@ -95,3 +95,55 @@ func SeedIfEmpty(db *gorm.DB) error {
 		return nil
 	})
 }
+
+func SeedDailyBookingsForToday(db *gorm.DB) error {
+	today := timeutil.Today()
+
+	var stalls []domain.Stall
+	if err := db.Find(&stalls).Error; err != nil {
+		return fmt.Errorf("load stalls: %w", err)
+	}
+	if len(stalls) == 0 {
+		return nil
+	}
+
+	var existing []domain.DailyBooking
+	if err := db.Where("market_date = ?", today).Find(&existing).Error; err != nil {
+		return fmt.Errorf("load today bookings: %w", err)
+	}
+	have := make(map[uint]bool, len(existing))
+	for _, b := range existing {
+		have[b.StallID] = true
+	}
+
+	toCreate := make([]domain.DailyBooking, 0)
+	for _, s := range stalls {
+		if have[s.ID] {
+			continue
+		}
+		b := domain.DailyBooking{
+			StallID:    s.ID,
+			MarketDate: today,
+			Attendance: domain.AttendancePending,
+		}
+		if s.OwnerVendorID != nil {
+			b.Status = domain.StatusExpected
+			b.VendorID = s.OwnerVendorID
+			b.ShopName = "ร้าน" + s.Code
+			b.ProductType = "ของสด"
+		} else {
+			b.Status = domain.StatusAvailable
+		}
+		toCreate = append(toCreate, b)
+	}
+
+	if len(toCreate) == 0 {
+		log.Printf("daily_bookings for %s already present", today.Format("2006-01-02"))
+		return nil
+	}
+	if err := db.Create(&toCreate).Error; err != nil {
+		return fmt.Errorf("create today bookings: %w", err)
+	}
+	log.Printf("seeded %d daily_bookings for %s", len(toCreate), today.Format("2006-01-02"))
+	return nil
+}

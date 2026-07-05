@@ -11,6 +11,7 @@ type Config struct {
 	AppPort     string
 	DatabaseURL string
 	JWTSecret   string
+	CORSOrigins string
 }
 
 
@@ -22,6 +23,7 @@ func Load() *Config {
 		AppPort:     getEnv("APP_PORT", "8080"),
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		JWTSecret:   getEnv("JWT_SECRET", "dev-secret-change-me"),
+		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
 	}
 
 	if cfg.DatabaseURL == "" {

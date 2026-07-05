@@ -13,41 +13,34 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE** — **ยังไม่ commit/push Phase 8** (Dockerfile, compose, `.env.example`)
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE** (commit `ff85bba`). **Session ถัดไป: Frontend F1 (WALKIN)**
 
-### Next session (อ่านก่อนเริ่ม)
+### Next session (อ่านก่อนเริ่ม Frontend)
 
-1. **Commit + push** Phase 8 ถ้ายังไม่ push (ดูรายการไฟล์ด้านล่าง)
-2. **เลือกทางต่อ:** Frontend Vue 3 **หรือ** Product Phase 2 (LINE LIFF, seed-today, BOOK audit)
-3. Optional: `SeedDailyBookingsForToday()` — dev UX ข้ามวัน
+1. อ่าน section **Frontend roadmap** ด้านล่าง — **ยังไม่ implement** จนกว่าจะคุย scope กับ user อีกครั้ง
+2. Backend เตรียม: เพิ่ม **CORS** ใน `main.go` (หรือ Vite proxy ตอน dev)
+3. รัน API ก่อนเทส UI: `docker compose up` หรือ `go run ./cmd/api`
+4. ใช้ `?date=` / body `date` ตรง `market_date` ใน DB (ดู log seed)
 
-### Phase 8 ที่ทำแล้ว (session ล่าสุด)
+### Phase 8 — DONE (commit แล้ว)
 
 | ไฟล์ | งาน |
 |------|-----|
-| [`docker-compose.yml`](docker-compose.yml) | `postgres:17-alpine` + `api` (build `./backend`), healthcheck, volume `pgdata` |
+| [`docker-compose.yml`](docker-compose.yml) | `postgres:17-alpine` + `api`, secrets จาก `.env` |
 | [`backend/Dockerfile`](backend/Dockerfile) | multi-stage Go 1.24 → alpine, `TZ=Asia/Bangkok` |
 | [`backend/.dockerignore`](backend/.dockerignore) | กัน `.env`, binaries |
-| [`.env.example`](.env.example) | template secrets สำหรับ compose — **commit ได้** |
-| `.env` (root) | 
+| [`.env.example`](.env.example) | template secrets (commit ได้) — copy → `.env` |
 
-**Secrets:** `docker-compose.yml` ใช้ `${POSTGRES_PASSWORD}`, `${JWT_SECRET}` จาก `.env` — 
+**Secrets:** compose ใช้ `${POSTGRES_PASSWORD}`, `${JWT_SECRET}` จาก `.env` (root) — **ไม่ hardcode ใน repo**
 
-**สองไฟล์ env แยกกัน:**
+**สองไฟล์ env:**
 
 | ไฟล์ | ใช้เมื่อ |
 |------|---------|
-| `D:\taladsync\.env` | `docker compose up` |
-| `backend\.env` | `go run ./cmd/api` |
+| `.env` (root) | `docker compose up` |
+| `backend/.env` | `go run ./cmd/api` |
 
-
-
-### Pitfalls Docker (สำคัญ)
-
-- **เปลี่ยน `POSTGRES_PASSWORD` หลัง volume สร้างแล้ว** → auth fail (`SQLSTATE 28P01`) — Postgres ไม่ re-init รหัส  
-  **แก้:** `docker compose down -v` แล้ว `up --build` ใหม่ (ลบข้อมูล DB ใน volume)
-- Port `5432` / `8080` ชนกับ Postgres local หรือ `go run` — หยุดก่อน
-- Seed ใน container ครั้งแรกเท่านั้น — `market_date` = วันที่ seed (ดู log `seed complete ... for YYYY-MM-DD`)
+**Pitfalls Docker:** เปลี่ยน `POSTGRES_PASSWORD` หลัง volume สร้างแล้ว → `docker compose down -v` แล้ว up ใหม่; port 5432/8080 ชน local ได้
 
 ### Incremental roadmap
 
@@ -61,9 +54,70 @@
 | 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit (LEAVE/CHECKIN/NOSHOW) |
 | 6 | **DONE** | Directory — `GET /api/directory?q=` public, ไม่มี PII |
 | 7 | **DONE** | Concurrent test — 50 goroutines, 1 winner (`-tags=integration`) |
-| 8 | **DONE** | DevOps — compose + Dockerfile + `.env.example` (secrets นอก repo) |
+| 8 | **DONE** | DevOps — compose + Dockerfile + `.env.example` |
 
-### DONE (มีไฟล์แล้ว)
+### Frontend roadmap (ถัดไป — **ยังไม่เริ่มโค้ด**)
+
+**ตัดสินใจแล้ว:** เริ่มจาก **WALKIN (ขาจรจองแผง)** ก่อน role อื่น
+
+| Phase | สถานะ | เป้าหมาย |
+|-------|--------|----------|
+| F1 | **TODO** | WALKIN — mock-login, รายการแผงว่าง, ฟอร์มจอง, แสดง 409 |
+| F2 | TODO | STAFF — checklist roll-call + summary |
+| F3 | TODO | REGULAR — แจ้งหยุด |
+| F4 | TODO | Public — directory ค้นหาร้าน (+ แผนที่ posX/posY ถ้าต้องการ) |
+
+**Stack (F1):** Vue 3 + **Vite** + **TypeScript** + **Tailwind CSS** + **Pinia** + Vue Router
+
+**โฟลเดอร์ที่วางแผน:**
+
+```
+frontend/                    ← ยังไม่มี — สร้างตอน implement F1
+├── src/
+│   ├── api/                 # fetch client, types, error mapping
+│   ├── stores/auth.ts       # Pinia: token, user, mockLogin(WALKIN)
+│   ├── views/WalkinView.vue # list available + book
+│   ├── components/
+│   └── router/
+├── .env.example             # VITE_API_URL=http://localhost:8080
+└── vite.config.ts           # dev proxy → :8080 (ทางเลือกแทน CORS)
+```
+
+**F1 user flow:**
+
+```
+1. POST /api/auth/mock-login  { "role": "WALKIN" }  → เก็บ token (Pinia + localStorage)
+2. GET  /api/stalls/available?date=YYYY-MM-DD       → แสดงรายการแผง pool
+3. POST /api/bookings  { stallId, shopName, productType, date? }  → 201 หรือ 409
+```
+
+**F1 scope (MVP UI):**
+
+- Mobile-first, Tailwind
+- เลือก/แสดง `market_date` (default วันนี้ — ต้องตรง seed ใน DB)
+- Loading + error states ทุก API call
+- ข้อความ 409 เป็นภาษาไทย (แผงเต็ม / จองวันนี้แล้ว)
+- **Out of scope F1:** แผนที่, STAFF/REGULAR, LINE LIFF, role picker หลาย role
+
+**Backend ที่ต้องทำก่อน/พร้อมกับ F1:**
+
+- [ ] **CORS** — `fiber/middleware/cors` ใน `main.go` (ตอนนี้ยังไม่มี; browser จาก `:5173` จะ block)
+- [ ] (ทางเลือก) Vite `server.proxy` `/api` → `http://localhost:8080` ช่วง dev
+
+**F1 implementation todos (เมื่อเริ่ม session):**
+
+1. Scaffold `frontend/` (Vite + Vue + TS + Tailwind + Pinia + Router)
+2. CORS หรือ Vite proxy
+3. `api/client` + types + auth store
+4. `WalkinView` — list + book form + 409 handling
+5. README/AGENTS.md อัปเดต + commit
+
+### Backend optional polish (ไม่ block F1)
+
+1. **Seed daily bookings for today** — dev UX ข้ามวัน
+2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
+
+### DONE — Backend (มีไฟล์แล้ว)
 
 | Layer | ไฟล์ | หมายเหตุ |
 |---|---|---|
@@ -81,11 +135,11 @@
 | **env** | `backend/.env.example`, `.env.example` (root) | local dev vs docker compose |
 | **deps** | `backend/go.mod`, `go.sum` | Fiber, godotenv, GORM, postgres, jwt/v5, testcontainers-go |
 
-### TODO (optional polish)
+### TODO
 
-1. **Seed daily bookings for today** — dev UX ข้ามวัน
-2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
-3. **Frontend Vue 3** — vendor grab UI, staff checklist, customer map
+- **Frontend F1** — ดู Frontend roadmap ด้านบน (ยังไม่ implement)
+- Backend polish: seed-today, BOOK audit
+- **Product Phase 2** — LINE LIFF, financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
 
@@ -112,9 +166,9 @@ api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.Role
 
 ## Tech Stack
 
-- **Backend:** Go 1.24 + Fiber v2 + GORM + PostgreSQL 17 (`localhost:5432`)
-- **Frontend (ยังไม่เริ่ม):** Vue 3 + Tailwind + Pinia
-- **Auth:** JWT (MVP mock login), production = LINE LIFF
+- **Backend:** Go 1.24 + Fiber v2 + GORM + PostgreSQL 17
+- **Frontend (F1 วางแผนแล้ว):** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router — โฟลเดอร์ `frontend/` ยังไม่มี
+- **Auth:** JWT mock login (MVP) → production LINE LIFF
 - **Project root:** `D:\taladsync`
 
 ## Architecture: Modular Monolith + Clean Architecture
@@ -122,20 +176,14 @@ api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.Role
 **Dependency rule:** ลูกศรชี้เข้าด้านใน `handler → usecase → domain` ; `repository` implement interface ของ `usecase`
 
 ```
-cmd/api/main.go          ← DONE (health + auth + booking + vendor + staff + directory)
-internal/
-  config/                ← DONE
-  domain/                ← DONE (models, errors, inputs, DirectoryEntry)
-  database/              ← DONE (connect + migrate + seed + idx_vendor_one_booked_per_day)
-  pkg/timeutil/          ← DONE (Today, Now, MarketDate)
-  auth/                  ← DONE (JWT)
-  repository/            ← DONE (user, booking, audit)
-  usecase/               ← DONE (auth, booking, vendor, staff, directory + tests)
-  handler/               ← DONE (auth, booking, vendor, staff, directory, date, errors)
-  middleware/            ← DONE (Auth, RequireRoles)
+backend/                     ← DONE (Phase 0–8)
+frontend/                    ← TODO F1 (WALKIN) — ยังไม่สร้าง
 ```
 
-**หมายเหตุ:** domain model มี gorm tag (pragmatic); testability มาจาก usecase พึ่ง interface ไม่ใช่ GORM ตรง ๆ
+**Backend** (`cmd/api/main.go` …) — DONE: health, auth, booking, vendor, staff, directory
+
+**Frontend** — ยังไม่มี; เริ่มที่ WALKIN ตาม Frontend roadmap
+
 
 ## Core Concurrency Rule (สำคัญที่สุด)
 
@@ -320,7 +368,7 @@ docker compose logs -f api   # ดู log
 
 **Verify แล้ว:** build ผ่าน, seed อัตโนมัติ, health OK
 
-## Phase 2 / Frontend (ถัดไป — ยังไม่ทำ)
+## Phase 2 Product (ยังไม่ทำ — หลัง Frontend MVP)
 
 - LINE LIFF / Push จริง (Flash Drop)
 - โควตาวันหยุด, แจ้งหยุดฉุกเฉิน 2 ครั้ง/เดือน, ลาพักยาว+อนุมัติ
@@ -328,4 +376,3 @@ docker compose logs -f api   # ดู log
 - แจ้งมาช้า (late arrival lock)
 - **Financial tracking** (เก็บเงิน 20 บ. ในระบบ + สรุปยอดส่งคลัง) — ตัดออกจาก MVP แล้ว
 - national_id encryption เต็มรูปแบบ (PDPA)
-- Frontend Vue 3 (vendor grab UI, staff checklist, customer map)
