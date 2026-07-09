@@ -1,0 +1,13 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# local env (ก็อปจาก .env.example)
+.env
+.env.*
+!.env.example
+
+# editor / os
+.DS_Store
+*.log
