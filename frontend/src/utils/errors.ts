@@ -11,3 +11,14 @@ export function bookErrorMessageTH(code: BookErrorCode): string {
       return 'จองไม่สำเร็จ ลองใหม่อีกครั้ง'
   }
 }
+
+export function leaveErrorMessageTH(code: BookErrorCode): string {
+  switch (code) {
+    case 'LEAVE_NOT_ALLOWED':
+      return 'แผงนี้แจ้งหยุดไม่ได้แล้ว (อาจแจ้งไปแล้วหรือมีขาจรจองต่อ)'
+    case 'NOT_OWN_STALL':
+      return 'ไม่ใช่แผงของคุณ'
+    default:
+      return 'แจ้งหยุดไม่สำเร็จ ลองใหม่อีกครั้ง'
+  }
+}

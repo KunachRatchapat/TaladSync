@@ -35,7 +35,9 @@ function mapHttpError(status: number, message: string): ApiError {
   if (status === 409) {
     if (message === 'stall is not available') return new ApiError('STALL_NOT_AVAILABLE')
     if (message === 'vendor already booked today') return new ApiError('ALREADY_HAS_STALL')
+    if (message === 'leave not allowed for this stall') return new ApiError('LEAVE_NOT_ALLOWED')
   }
+  if (status === 403 && message === 'not your stall') return new ApiError('NOT_OWN_STALL')
   return new ApiError('UNKNOWN')
 }
 
