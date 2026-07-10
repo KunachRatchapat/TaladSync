@@ -13,16 +13,17 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) + F2 (STAFF) + F3 (REGULAR) DONE**. ถัดไป **F4 (Public directory)**
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1–F4 DONE (MVP ครบ 4 หน้า)**. ถัดไป **Product Phase 2**
 
-- F1 merged → `main`. F2 merged → `main`. **F3 อยู่บน branch `regular-frontend`** (ยังไม่ merge/push)
+- F1/F2/F3 merged → `main`. **F4 อยู่บน branch `directory-frontend`** (ยังไม่ merge/push)
 - `ensureWalkin` → refactor เป็น `ensureRole(role)` แล้ว (auth store เก็บ role คู่ token กัน 403 ข้าม role)
+- **DevNav** — pill สลับ 4 หน้า (dev only, gate `import.meta.env.DEV`) ใน `App.vue`
 
 ### Next session
 
-1. **Frontend F4** — Public directory ค้นหาร้าน (`GET /api/directory?q=`)
-2. merge `regular-frontend` → `main` (ถ้า user พร้อม) แล้ว push
-3. รัน API **เวอร์ชันล่าสุด** ก่อนเทส — F3 ต้องมี `GET /api/vendor/mine` (restart `go run ./cmd/api`)
+1. merge `directory-frontend` → `main` (ถ้า user พร้อม) แล้ว push
+2. รัน API **เวอร์ชันล่าสุด** ก่อนเทส — restart `go run ./cmd/api` (มี `/vendor/mine`, `/directory`)
+3. **Product Phase 2** — LINE LIFF, map (posX/posY), financial, PDPA
 4. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
 
 ### Backend เพิ่มระหว่าง F1 (commit แล้ว `59eced9`)
@@ -74,7 +75,7 @@
 | F1 | **DONE** | WALKIN — auto mock-login, รายการแผงว่าง, ฟอร์มจอง, 409 ไทย, จองแล้วแสดงการ์ด |
 | F2 | **DONE** | STAFF — checklist roll-call (progress + toggle มา/ไม่มา), summary นับ client-side |
 | F3 | **DONE** | REGULAR — `GET /api/vendor/mine` แผงตัวเอง + แจ้งหยุด (modal ยืนยัน, optimistic) — branch `regular-frontend` |
-| F4 | TODO | Public — directory ค้นหาร้าน (+ แผนที่ posX/posY ถ้าต้องการ) |
+| F4 | **DONE** | Public — directory ค้นหาร้าน (search debounce, ไม่มี login) — branch `directory-frontend`; แผนที่ posX/posY ไว้ Phase 2 |
 
 **Stack:** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router + `@jamescoyle/vue-icon` + `@mdi/js`
 
@@ -146,10 +147,9 @@ frontend/
 
 ### TODO
 
-- **merge `regular-frontend` → `main`** (F3 พร้อม) + push
-- **Frontend F4** — Public directory ค้นหาร้าน
+- **merge `directory-frontend` → `main`** (F4 พร้อม) + push
 - Backend polish: BOOK audit
-- **Product Phase 2** — LINE LIFF, financial, PDPA (ดู section ท้ายไฟล์)
+- **Product Phase 2** — LINE LIFF, map (posX/posY), financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
 
