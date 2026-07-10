@@ -2,25 +2,28 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { mockLogin } from '@/api/auth'
-import { clearStoredToken, getStoredToken, setStoredToken } from '@/api/client'
-import type { User } from '@/types'
+import { clearStoredAuth, getStoredRole, getStoredToken, setStoredAuth } from '@/api/client'
+import type { Role, User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(getStoredToken())
+  const role = ref<Role | null>(getStoredRole())
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref('')
 
-  async function ensureWalkin(): Promise<void> {
-    if (token.value) return
+  
+  async function ensureRole(target: Role): Promise<void> {
+    if (token.value && role.value === target) return
 
     loading.value = true
     error.value = ''
     try {
-      const res = await mockLogin('WALKIN')
+      const res = await mockLogin(target)
       token.value = res.token
+      role.value = res.user.role
       user.value = res.user
-      setStoredToken(res.token)
+      setStoredAuth(res.token, res.user.role)
     } catch {
       error.value = 'เข้าสู่ระบบไม่สำเร็จ ลองใหม่อีกครั้ง'
       throw new Error(error.value)
@@ -31,9 +34,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout() {
     token.value = null
+    role.value = null
     user.value = null
-    clearStoredToken()
+    clearStoredAuth()
   }
 
-  return { token, user, loading, error, ensureWalkin, logout }
+  return { token, role, user, loading, error, ensureRole, logout }
 })

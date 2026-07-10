@@ -1,17 +1,26 @@
 import { ApiError } from '@/api/errors'
+import type { Role } from '@/types'
 
 const TOKEN_KEY = 'taladsync_token'
+const ROLE_KEY = 'taladsync_role'
 
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY)
 }
 
-export function setStoredToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
+export function getStoredRole(): Role | null {
+  return localStorage.getItem(ROLE_KEY) as Role | null
 }
 
-export function clearStoredToken(): void {
+
+export function setStoredAuth(token: string, role: Role): void {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(ROLE_KEY, role)
+}
+
+export function clearStoredAuth(): void {
   localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(ROLE_KEY)
 }
 
 function apiBase(): string {

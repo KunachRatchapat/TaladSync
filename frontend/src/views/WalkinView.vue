@@ -21,7 +21,7 @@ const stallCount = computed(() => stalls.value.length)
 
 async function reload() {
   try {
-    await auth.ensureWalkin()
+    await auth.ensureRole('WALKIN')
   } catch {
     return
   }
