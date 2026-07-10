@@ -61,5 +61,17 @@ export interface AttendanceSummary {
   total: number
 }
 
+// --- Public directory (F4) ---
+
+// 1 element ใน { results: [...] } จาก GET /api/directory — ไม่มี PII
+export interface DirectoryEntry {
+  stallCode: string
+  zone: string
+  shopName: string
+  productType: string
+  posX: number
+  posY: number
+}
+
 // สถานะ async รวมของหน้าจอ
 export type ViewState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
