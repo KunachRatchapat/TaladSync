@@ -37,5 +37,29 @@ export interface BookingForm {
   date: string
 }
 
+// --- STAFF roll-call (F2) ---
+
+export type AttendanceStatus = 'PENDING' | 'PRESENT' | 'NOSHOW'
+
+// 1 element ใน { items: [...] } จาก GET /api/staff/checklist (แผงที่มีคน + สถานะเช็คชื่อ)
+export interface ChecklistItem {
+  id: number // = daily_bookings.id ใช้ยิง /bookings/:id/attendance
+  stallId: number
+  status: BookingStatus
+  shopName?: string
+  productType?: string
+  attendance: AttendanceStatus
+  checkedAt?: string
+  stall: Stall
+}
+
+// นับฝั่ง client จาก items (checklist = เซ็ตเดียวกับ summary) — camelCase ตาม UI
+export interface AttendanceSummary {
+  present: number
+  noShow: number
+  pending: number
+  total: number
+}
+
 // สถานะ async รวมของหน้าจอ
 export type ViewState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
