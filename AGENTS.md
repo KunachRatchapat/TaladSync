@@ -13,16 +13,15 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) DONE** (ยังไม่ commit — รอ user review)
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) DONE + commit แล้ว** (`59eced9`). ถัดไป **F2 (STAFF)**
 
 ### Next session
 
-1. **Commit F1** — frontend + `GET /api/bookings/mine` (ถ้า user พร้อม)
-2. **Frontend F2** — STAFF checklist roll-call + summary
-3. ลบ `frontend/src/api/mock.ts` (ไม่ใช้แล้ว) ถ้าต้องการ cleanup
-4. รัน API **เวอร์ชันล่าสุด** ก่อนเทส UI — ต้องมี `GET /api/bookings/mine` (restart `go run ./cmd/api` หรือ `docker compose up --build`)
+1. **Frontend F2** — STAFF checklist roll-call + summary (ต้อง refactor `stores/auth.ts` `ensureWalkin` → รองรับหลาย role)
+2. รัน API **เวอร์ชันล่าสุด** ก่อนเทส UI — ต้องมี `GET /api/bookings/mine` (restart `go run ./cmd/api` หรือ `docker compose up --build`)
+3. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
 
-### Backend เพิ่มระหว่าง F1 (ยังไม่ commit)
+### Backend เพิ่มระหว่าง F1 (commit แล้ว `59eced9`)
 
 | งาน | ไฟล์ | หมายเหตุ |
 |------|------|----------|
@@ -84,8 +83,7 @@ frontend/
 │   │   ├── client.ts          # fetch + Bearer token + map 409
 │   │   ├── auth.ts            # mock-login
 │   │   ├── booking.ts         # stalls/available, bookings, bookings/mine
-│   │   ├── errors.ts
-│   │   └── mock.ts            # ไม่ใช้แล้ว (ลบได้)
+│   │   └── errors.ts
 │   ├── stores/auth.ts         # Pinia: ensureWalkin + localStorage token
 │   ├── composables/            # useAvailableStalls, useBooking
 │   ├── components/            # AppHeader, StallCard, BookingModal, BookedTodayCard, ...
@@ -144,10 +142,8 @@ frontend/
 
 ### TODO
 
-- **Commit F1** — frontend + `bookings/mine` (รอ user)
 - **Frontend F2** — STAFF roll-call UI
 - Backend polish: BOOK audit
-- ลบ `frontend/src/api/mock.ts` (optional cleanup)
 - **Product Phase 2** — LINE LIFF, financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
