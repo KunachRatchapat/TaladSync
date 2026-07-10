@@ -3,9 +3,22 @@ import { computed } from 'vue'
 
 import { formatThaiDate } from '@/utils/date'
 
-const props = defineProps<{ date: string }>()
+const props = withDefaults(
+  defineProps<{
+    date: string
+    variant?: 'walkin' | 'staff'
+  }>(),
+  { variant: 'walkin' },
+)
 
 const thaiDate = computed(() => formatThaiDate(props.date))
+const tag = computed(() =>
+  props.variant === 'staff' ? 'เจ้าหน้าที่ · เช็คชื่อ' : 'จองแผงวันนี้ได้เลยจ้า \u{1F603}',
+)
+// โหมด staff = badge สีเข้ม (ink) ให้รู้สึก "โหมดทำงาน" ต่างจากขาจรสีเขียว
+const tagClass = computed(() =>
+  props.variant === 'staff' ? 'bg-gray-900 text-white' : 'bg-brand-50 text-brand-700',
+)
 </script>
 
 <template>
@@ -13,8 +26,8 @@ const thaiDate = computed(() => formatThaiDate(props.date))
     <div class="mx-auto flex max-w-app flex-col gap-2 px-4 py-3">
       <div class="flex items-center gap-2">
         <span class="text-lg font-semibold text-brand-700">TaladSync</span>
-        <span class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">
-          จองแผงวันนี้ได้เลยจ้า &#128515;
+        <span class="rounded-full px-2 py-0.5 text-xs font-medium" :class="tagClass">
+          {{ tag }}
         </span>
       </div>
 

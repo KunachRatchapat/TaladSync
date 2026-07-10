@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import StaffView from '@/views/StaffView.vue'
 import WalkinView from '@/views/WalkinView.vue'
 
 const router = createRouter({
@@ -9,6 +10,11 @@ const router = createRouter({
       path: '/',
       name: 'walkin',
       component: WalkinView,
+    },
+    {
+      path: '/staff',
+      name: 'staff',
+      component: StaffView,
     },
   ],
 })
