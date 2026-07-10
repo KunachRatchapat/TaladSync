@@ -13,13 +13,17 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) DONE + commit แล้ว** (`59eced9`). ถัดไป **F2 (STAFF)**
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) + F2 (STAFF) + F3 (REGULAR) DONE**. ถัดไป **F4 (Public directory)**
+
+- F1 merged → `main`. F2 merged → `main`. **F3 อยู่บน branch `regular-frontend`** (ยังไม่ merge/push)
+- `ensureWalkin` → refactor เป็น `ensureRole(role)` แล้ว (auth store เก็บ role คู่ token กัน 403 ข้าม role)
 
 ### Next session
 
-1. **Frontend F2** — STAFF checklist roll-call + summary (ต้อง refactor `stores/auth.ts` `ensureWalkin` → รองรับหลาย role)
-2. รัน API **เวอร์ชันล่าสุด** ก่อนเทส UI — ต้องมี `GET /api/bookings/mine` (restart `go run ./cmd/api` หรือ `docker compose up --build`)
-3. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
+1. **Frontend F4** — Public directory ค้นหาร้าน (`GET /api/directory?q=`)
+2. merge `regular-frontend` → `main` (ถ้า user พร้อม) แล้ว push
+3. รัน API **เวอร์ชันล่าสุด** ก่อนเทส — F3 ต้องมี `GET /api/vendor/mine` (restart `go run ./cmd/api`)
+4. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
 
 ### Backend เพิ่มระหว่าง F1 (commit แล้ว `59eced9`)
 
@@ -55,7 +59,7 @@
 |-------|--------|----------|
 | 0 | **DONE** | Health API — `cmd/api/main.go` + `GET /health` |
 | 1 | **DONE** | Domain models (4 tables) + Postgres connect + migrate |
-| 2 | **DONE** | Seed (users 3 roles, stalls, daily_bookings) |
+| 2 | **DONE** | Seed — **1 แม่ค้าประจำ : 1 แผง** (12 REGULAR เจ้าของ A-01..A-12 คนละแผง) + 1 WALKIN + 1 STAFF + pool P-01..P-08; mock-login REGULAR = คนแรก (เจ้าของ A-01) |
 | 3 | **DONE** | Auth mock-login + JWT middleware + `GET /api/auth/me` |
 | 4 | **DONE** | Booking — list/book, 409, `date?` body, partial unique index (1 vendor/วัน), unit tests |
 | 5 | **DONE** | Vendor leave + staff checklist/attendance/summary + audit (LEAVE/CHECKIN/NOSHOW) |
@@ -68,8 +72,8 @@
 | Phase | สถานะ | เป้าหมาย |
 |-------|--------|----------|
 | F1 | **DONE** | WALKIN — auto mock-login, รายการแผงว่าง, ฟอร์มจอง, 409 ไทย, จองแล้วแสดงการ์ด |
-| F2 | **TODO** | STAFF — checklist roll-call + summary |
-| F3 | TODO | REGULAR — แจ้งหยุด |
+| F2 | **DONE** | STAFF — checklist roll-call (progress + toggle มา/ไม่มา), summary นับ client-side |
+| F3 | **DONE** | REGULAR — `GET /api/vendor/mine` แผงตัวเอง + แจ้งหยุด (modal ยืนยัน, optimistic) — branch `regular-frontend` |
 | F4 | TODO | Public — directory ค้นหาร้าน (+ แผนที่ posX/posY ถ้าต้องการ) |
 
 **Stack:** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router + `@jamescoyle/vue-icon` + `@mdi/js`
@@ -142,7 +146,8 @@ frontend/
 
 ### TODO
 
-- **Frontend F2** — STAFF roll-call UI
+- **merge `regular-frontend` → `main`** (F3 พร้อม) + push
+- **Frontend F4** — Public directory ค้นหาร้าน
 - Backend polish: BOOK audit
 - **Product Phase 2** — LINE LIFF, financial, PDPA (ดู section ท้ายไฟล์)
 
@@ -162,6 +167,7 @@ api.Get("/directory", directoryHandler.Search)  // public — ไม่มี au
 api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
 api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)  // F1: เช็กจองวันนี้
 api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
+api.Get("/vendor/mine", authMW, middleware.RequireRoles(domain.RoleRegular), ...)  // F3: แผงของ vendor
 api.Post("/vendor/leave", authMW, middleware.RequireRoles(domain.RoleRegular), ...)
 api.Get("/staff/checklist", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
 api.Get("/staff/summary", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
@@ -249,7 +255,8 @@ CheckedAt        *time.Time
 | GET | `/api/stalls/available?date=` | WALKIN | **DONE** | แผงว่างใน pool |
 | GET | `/api/bookings/mine?date=` | WALKIN | **DONE** | การจองของ vendor วันนี้ (`{ booking: null \| ... }`) |
 | POST | `/api/bookings` | WALKIN | **DONE** | `{stallId, shopName, productType, date?}` → 409 ถ้าเต็ม |
-| POST | `/api/vendor/leave` | REGULAR | **DONE** | `{stallId, date?}` แจ้งหยุด |
+| GET | `/api/vendor/mine?date=` | REGULAR | **DONE** | แผงที่ vendor เป็นเจ้าของ + สถานะวันนี้ (query by `stalls.owner_vendor_id`) → `{ stalls: [...] }` |
+| POST | `/api/vendor/leave` | REGULAR | **DONE** | `{stallId, date?}` แจ้งหยุด (EXPECTED→AVAILABLE) |
 | GET | `/api/staff/checklist?date=` | STAFF | **DONE** | roll-call ทุกแผงที่มีคน |
 | POST | `/api/bookings/:id/attendance` | STAFF | **DONE** | `{present: true/false}` |
 | GET | `/api/staff/summary?date=` | STAFF | **DONE** | `{present, noShow, pending, total}` |
