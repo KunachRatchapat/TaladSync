@@ -13,14 +13,22 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE** (commit `ff85bba`). **Session ถัดไป: Frontend F1 (WALKIN)**
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1 (WALKIN) DONE** (ยังไม่ commit — รอ user review)
 
-### Next session (อ่านก่อนเริ่ม Frontend)
+### Next session
 
-1. อ่าน section **Frontend roadmap** ด้านล่าง — **ยังไม่ implement** จนกว่าจะคุย scope กับ user อีกครั้ง
-2. Backend เตรียม: เพิ่ม **CORS** ใน `main.go` (หรือ Vite proxy ตอน dev)
-3. รัน API ก่อนเทส UI: `docker compose up` หรือ `go run ./cmd/api`
-4. ใช้ `?date=` / body `date` ตรง `market_date` ใน DB (ดู log seed)
+1. **Commit F1** — frontend + `GET /api/bookings/mine` (ถ้า user พร้อม)
+2. **Frontend F2** — STAFF checklist roll-call + summary
+3. ลบ `frontend/src/api/mock.ts` (ไม่ใช้แล้ว) ถ้าต้องการ cleanup
+4. รัน API **เวอร์ชันล่าสุด** ก่อนเทส UI — ต้องมี `GET /api/bookings/mine` (restart `go run ./cmd/api` หรือ `docker compose up --build`)
+
+### Backend เพิ่มระหว่าง F1 (ยังไม่ commit)
+
+| งาน | ไฟล์ | หมายเหตุ |
+|------|------|----------|
+| `GET /api/bookings/mine?date=` | `handler/booking.go`, `usecase/booking.go`, `repository/booking.go`, `main.go` | WALKIN เช็กจองวันนี้แล้วหรือยัง → `{ booking: null \| DailyBooking }` |
+| CORS | `cmd/api/main.go` | `AllowOrigins` จาก `CORS_ORIGINS` (default `http://localhost:5173`) |
+| Seed today | `database/seed.go` | `SeedDailyBookingsForToday` รันทุกครั้งที่ API start |
 
 ### Phase 8 — DONE (commit แล้ว)
 
@@ -56,65 +64,64 @@
 | 7 | **DONE** | Concurrent test — 50 goroutines, 1 winner (`-tags=integration`) |
 | 8 | **DONE** | DevOps — compose + Dockerfile + `.env.example` |
 
-### Frontend roadmap (ถัดไป — **ยังไม่เริ่มโค้ด**)
-
-**ตัดสินใจแล้ว:** เริ่มจาก **WALKIN (ขาจรจองแผง)** ก่อน role อื่น
+### Frontend roadmap
 
 | Phase | สถานะ | เป้าหมาย |
 |-------|--------|----------|
-| F1 | **TODO** | WALKIN — mock-login, รายการแผงว่าง, ฟอร์มจอง, แสดง 409 |
-| F2 | TODO | STAFF — checklist roll-call + summary |
+| F1 | **DONE** | WALKIN — auto mock-login, รายการแผงว่าง, ฟอร์มจอง, 409 ไทย, จองแล้วแสดงการ์ด |
+| F2 | **TODO** | STAFF — checklist roll-call + summary |
 | F3 | TODO | REGULAR — แจ้งหยุด |
 | F4 | TODO | Public — directory ค้นหาร้าน (+ แผนที่ posX/posY ถ้าต้องการ) |
 
-**Stack (F1):** Vue 3 + **Vite** + **TypeScript** + **Tailwind CSS** + **Pinia** + Vue Router
+**Stack:** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router + `@jamescoyle/vue-icon` + `@mdi/js`
 
-**โฟลเดอร์ที่วางแผน:**
+**โฟลเดอร์ `frontend/` (มีแล้ว):**
 
 ```
-frontend/                    ← ยังไม่มี — สร้างตอน implement F1
+frontend/
 ├── src/
-│   ├── api/                 # fetch client, types, error mapping
-│   ├── stores/auth.ts       # Pinia: token, user, mockLogin(WALKIN)
-│   ├── views/WalkinView.vue # list available + book
-│   ├── components/
-│   └── router/
-├── .env.example             # VITE_API_URL=http://localhost:8080
-└── vite.config.ts           # dev proxy → :8080 (ทางเลือกแทน CORS)
+│   ├── api/
+│   │   ├── client.ts          # fetch + Bearer token + map 409
+│   │   ├── auth.ts            # mock-login
+│   │   ├── booking.ts         # stalls/available, bookings, bookings/mine
+│   │   ├── errors.ts
+│   │   └── mock.ts            # ไม่ใช้แล้ว (ลบได้)
+│   ├── stores/auth.ts         # Pinia: ensureWalkin + localStorage token
+│   ├── composables/            # useAvailableStalls, useBooking
+│   ├── components/            # AppHeader, StallCard, BookingModal, BookedTodayCard, ...
+│   ├── views/WalkinView.vue
+│   ├── utils/date.ts, errors.ts
+│   └── style.css              # .market-bg พื้นหลังตลาด
+├── .env.example               # VITE_API_URL=http://localhost:8080
+└── package.json, vite.config.ts, tailwind.config.js, package-lock.json
 ```
 
-**F1 user flow:**
+**F1 user flow (ต่อ API จริงแล้ว):**
 
 ```
-1. POST /api/auth/mock-login  { "role": "WALKIN" }  → เก็บ token (Pinia + localStorage)
-2. GET  /api/stalls/available?date=YYYY-MM-DD       → แสดงรายการแผง pool
-3. POST /api/bookings  { stallId, shopName, productType, date? }  → 201 หรือ 409
+1. เปิดหน้า → ensureWalkin (token ใน localStorage หรือ POST mock-login WALKIN)
+2. GET /api/bookings/mine?date=   → ถ้ามี booking แสดง BookedTodayCard (1 แผง/วัน)
+3. ถ้ายังไม่จอง → GET /api/stalls/available?date=  → รายการแผง pool + badge จำนวน
+4. กดแผง → BookingModal → POST /api/bookings → 201 success หรือ 409 ไทย
 ```
 
-**F1 scope (MVP UI):**
+**F1 UI decisions (ตกลงกับ user แล้ว):**
 
-- Mobile-first, Tailwind
-- เลือก/แสดง `market_date` (default วันนี้ — ต้องตรง seed ใน DB)
-- Loading + error states ทุก API call
-- ข้อความ 409 เป็นภาษาไทย (แผงเต็ม / จองวันนี้แล้ว)
-- **Out of scope F1:** แผนที่, STAFF/REGULAR, LINE LIFF, role picker หลาย role
+- วันที่ = **วันนี้เท่านั้น** (ไม่มี date picker)
+- พื้นหลัง `.market-bg` — รูปตลาด Trang + overlay จาง
+- หัวข้อกลางจอ + badge จำนวนแผงว่าง
+- กฎ 1 ขาจร 1 แผง/วัน — จองแล้วแสดง `BookedTodayCard` แทนรายการแผง
+- **Out of scope F1:** แผนที่, STAFF/REGULAR, LINE LIFF, role picker, PWA/LIFF prep
 
-**Backend ที่ต้องทำก่อน/พร้อมกับ F1:**
+**Backend สำหรับ F1:**
 
-- [ ] **CORS** — `fiber/middleware/cors` ใน `main.go` (ตอนนี้ยังไม่มี; browser จาก `:5173` จะ block)
-- [ ] (ทางเลือก) Vite `server.proxy` `/api` → `http://localhost:8080` ช่วง dev
+- [x] **CORS** — `fiber/middleware/cors` ใน `main.go`
+- [x] **Seed today** — `SeedDailyBookingsForToday`
+- [x] **GET /api/bookings/mine** — เช็กการจองของ vendor วันนี้
 
-**F1 implementation todos (เมื่อเริ่ม session):**
+### Backend optional polish (ไม่ block F2)
 
-1. Scaffold `frontend/` (Vite + Vue + TS + Tailwind + Pinia + Router)
-2. CORS หรือ Vite proxy
-3. `api/client` + types + auth store
-4. `WalkinView` — list + book form + 409 handling
-5. README/AGENTS.md อัปเดต + commit
-
-### Backend optional polish (ไม่ block F1)
-
-1. **Seed daily bookings for today** — dev UX ข้ามวัน
+1. ~~Seed daily bookings for today~~ — **DONE**
 2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
 
 ### DONE — Backend (มีไฟล์แล้ว)
@@ -137,8 +144,10 @@ frontend/                    ← ยังไม่มี — สร้างต
 
 ### TODO
 
-- **Frontend F1** — ดู Frontend roadmap ด้านบน (ยังไม่ implement)
-- Backend polish: seed-today, BOOK audit
+- **Commit F1** — frontend + `bookings/mine` (รอ user)
+- **Frontend F2** — STAFF roll-call UI
+- Backend polish: BOOK audit
+- ลบ `frontend/src/api/mock.ts` (optional cleanup)
 - **Product Phase 2** — LINE LIFF, financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
@@ -155,6 +164,7 @@ authMW := middleware.Auth(tokenSvc)
 api.Get("/directory", directoryHandler.Search)  // public — ไม่มี authMW
 
 api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
+api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)  // F1: เช็กจองวันนี้
 api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), ...)
 api.Post("/vendor/leave", authMW, middleware.RequireRoles(domain.RoleRegular), ...)
 api.Get("/staff/checklist", authMW, middleware.RequireRoles(domain.RoleStaff), ...)
@@ -167,7 +177,7 @@ api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.Role
 ## Tech Stack
 
 - **Backend:** Go 1.24 + Fiber v2 + GORM + PostgreSQL 17
-- **Frontend (F1 วางแผนแล้ว):** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router — โฟลเดอร์ `frontend/` ยังไม่มี
+- **Frontend:** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router — โฟลเดอร์ `frontend/` **F1 DONE**
 - **Auth:** JWT mock login (MVP) → production LINE LIFF
 - **Project root:** `D:\taladsync`
 
@@ -176,13 +186,13 @@ api.Post("/bookings/:id/attendance", authMW, middleware.RequireRoles(domain.Role
 **Dependency rule:** ลูกศรชี้เข้าด้านใน `handler → usecase → domain` ; `repository` implement interface ของ `usecase`
 
 ```
-backend/                     ← DONE (Phase 0–8)
-frontend/                    ← TODO F1 (WALKIN) — ยังไม่สร้าง
+backend/                     ← DONE (Phase 0–8) + bookings/mine
+frontend/                    ← F1 DONE (WALKIN) · F2 TODO (STAFF)
 ```
 
-**Backend** (`cmd/api/main.go` …) — DONE: health, auth, booking, vendor, staff, directory
+**Backend** (`cmd/api/main.go` …) — DONE: health, auth, booking, vendor, staff, directory, bookings/mine
 
-**Frontend** — ยังไม่มี; เริ่มที่ WALKIN ตาม Frontend roadmap
+**Frontend** — F1 WALKIN done (`WalkinView`); ถัดไป F2 STAFF
 
 
 ## Core Concurrency Rule (สำคัญที่สุด)
@@ -241,6 +251,7 @@ CheckedAt        *time.Time
 | POST | `/api/auth/mock-login` | public | **DONE** | `{role}` → `{token, user}` |
 | GET | `/api/auth/me` | any JWT | **DONE** | profile จาก token |
 | GET | `/api/stalls/available?date=` | WALKIN | **DONE** | แผงว่างใน pool |
+| GET | `/api/bookings/mine?date=` | WALKIN | **DONE** | การจองของ vendor วันนี้ (`{ booking: null \| ... }`) |
 | POST | `/api/bookings` | WALKIN | **DONE** | `{stallId, shopName, productType, date?}` → 409 ถ้าเต็ม |
 | POST | `/api/vendor/leave` | REGULAR | **DONE** | `{stallId, date?}` แจ้งหยุด |
 | GET | `/api/staff/checklist?date=` | STAFF | **DONE** | roll-call ทุกแผงที่มีคน |
@@ -276,7 +287,21 @@ go run ./cmd/api
 # GET http://localhost:8080/health → {"status":"ok"}
 ```
 
-**หมายเหตุ dev:** seed สร้าง `daily_bookings` แค่วันที่ seed ครั้งแรก — query `?date=` / body `date` ต้องตรงวันใน DB (หรือ reset DB / รอ seed-today polish)
+**หมายเหตุ dev:** `SeedDailyBookingsForToday` สร้าง `daily_bookings` วันนี้อัตโนมัติทุกครั้งที่ API start
+
+### Frontend (Vite dev)
+
+```powershell
+cd frontend
+copy .env.example .env   # VITE_API_URL=http://localhost:8080
+npm install
+npm run dev
+# เปิด http://localhost:5173/
+```
+
+ต้องรัน backend ที่ `:8080` พร้อมกัน — **restart API** หลัง pull โค้ดใหม่เพื่อให้ `GET /api/bookings/mine` ทำงาน
+
+**ทดสอบจองใหม่ (dev):** ลบ booking ของ WALKIN ใน DB หรือ `docker compose down -v` แล้ว up ใหม่ · ลบ `localStorage` key `taladsync_token`
 
 ## Mock Login (ทดสอบ)
 

@@ -67,3 +67,22 @@ func (h *BookingHandler) Book(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"status": "booked"})
 }
+
+func (h *BookingHandler) GetMine(c *fiber.Ctx) error {
+	claims, err := middleware.GetClaims(c)
+	if err != nil {
+		return RespondError(c, errUnauthorized)
+	}
+
+	date, err := parseMarketDate(c.Query("date"))
+	if err != nil {
+		return badRequest(c)
+	}
+
+	booking, err := h.uc.GetMyBookingToday(c.Context(), claims.UserID, date)
+	if err != nil {
+		return RespondError(c, err)
+	}
+
+	return c.JSON(fiber.Map{"booking": booking})
+}

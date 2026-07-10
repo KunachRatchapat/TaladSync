@@ -11,6 +11,7 @@ type BookingRepository interface {
 	ListAvailable(ctx context.Context, date time.Time) ([]domain.DailyBooking, error)
 	TryBookStall(ctx context.Context, in domain.BookStallInput) (int64, error)
 	CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error)
+	FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error)
 }
 
 type BookingUsecase struct {
@@ -42,4 +43,8 @@ func (u *BookingUsecase) BookStall(ctx context.Context, in domain.BookStallInput
 		return domain.ErrStallNotAvailable
 	}
 	return nil
+}
+
+func (u *BookingUsecase) GetMyBookingToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
+	return u.repo.FindVendorBookedToday(ctx, vendorID, date)
 }

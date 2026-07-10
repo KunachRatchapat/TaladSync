@@ -66,6 +66,23 @@ func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorI
 	return count, err
 }
 
+func (r *BookingRepository) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
+	date = timeutil.MarketDate(date)
+	var booking domain.DailyBooking
+	err := r.db.WithContext(ctx).
+		Preload("Stall").
+		Where("vendor_id = ? AND market_date = ? AND status = ?",
+			vendorID, date, domain.StatusBooked).
+		First(&booking).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &booking, nil
+}
+
 func (r *BookingRepository) GetByStallAndDate(ctx context.Context, stallID uint, date time.Time) (*domain.DailyBooking, error) {
 	date = timeutil.MarketDate(date)
 	var booking domain.DailyBooking

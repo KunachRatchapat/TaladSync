@@ -40,6 +40,10 @@ func (m *mockBookingRepo) CountVendorBookingToday(ctx context.Context, vendorID 
 	return m.countToday, m.countTodayErr
 }
 
+func (m *mockBookingRepo) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
+	return nil, nil
+}
+
 func TestBookStall_Success(t *testing.T) {
 	repo := &mockBookingRepo{countToday: 0, tryRows: 1}
 	uc := NewBookingUsecase(repo)

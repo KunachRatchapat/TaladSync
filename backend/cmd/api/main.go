@@ -78,6 +78,7 @@ func main() {
 
 
 	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
+	api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.GetMine)
 	api.Post("/bookings", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.Book)
 
 	api.Post("/vendor/leave", authMW, middleware.RequireRoles(domain.RoleRegular), vendorHandler.Leave)
