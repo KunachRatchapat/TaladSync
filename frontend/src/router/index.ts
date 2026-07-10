@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import DirectoryView from '@/views/DirectoryView.vue'
 import RegularView from '@/views/RegularView.vue'
 import StaffView from '@/views/StaffView.vue'
 import WalkinView from '@/views/WalkinView.vue'
@@ -21,6 +22,11 @@ const router = createRouter({
       path: '/regular',
       name: 'regular',
       component: RegularView,
+    },
+    {
+      path: '/directory',
+      name: 'directory',
+      component: DirectoryView,
     },
   ],
 })

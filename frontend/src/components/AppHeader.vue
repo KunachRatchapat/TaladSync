@@ -6,7 +6,7 @@ import { formatThaiDate } from '@/utils/date'
 const props = withDefaults(
   defineProps<{
     date: string
-    variant?: 'walkin' | 'staff' | 'regular'
+    variant?: 'walkin' | 'staff' | 'regular' | 'public'
   }>(),
   { variant: 'walkin' },
 )
@@ -16,11 +16,13 @@ const thaiDate = computed(() => formatThaiDate(props.date))
 const tag = computed(() => {
   if (props.variant === 'staff') return 'เจ้าหน้าที่ · เช็คชื่อ'
   if (props.variant === 'regular') return 'แม่ค้าประจำ · แผงของฉัน'
+  if (props.variant === 'public') return 'ค้นหาร้านค้า'
   return 'จองแผงวันนี้ได้เลยจ้า \u{1F603}'
 })
 const tagClass = computed(() => {
   if (props.variant === 'staff') return 'bg-gray-900 text-white'
   if (props.variant === 'regular') return 'bg-warning-100 text-warning-700'
+  if (props.variant === 'public') return 'bg-sky-100 text-sky-700'
   return 'bg-brand-50 text-brand-700'
 })
 </script>
