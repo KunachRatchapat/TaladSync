@@ -23,32 +23,40 @@ func SeedIfEmpty(db *gorm.DB) error {
 
 	today := timeutil.Today()
 
+	const zoneAStalls = 12
+
 	return db.Transaction(func(tx *gorm.DB) error {
-		regular := domain.User{
-			NationalID: "1100700000001",
-			Name:       "แม่ค้าประจำ01",
-			Phone:      "0639999999",
-			Role:       domain.RoleRegular,
+		// แม่ค้าประจำหลายคน — 1 คน : 1 แผง (สมจริง; mock-login REGULAR = คนแรก เจ้าของ A-01)
+		regulars := make([]*domain.User, zoneAStalls)
+		for i := 0; i < zoneAStalls; i++ {
+			regulars[i] = &domain.User{
+				NationalID: fmt.Sprintf("11007000000%02d", i+1),
+				Name:       fmt.Sprintf("แม่ค้าประจำ%02d", i+1),
+				Phone:      fmt.Sprintf("063%07d", i+1),
+				Role:       domain.RoleRegular,
+			}
 		}
 		walkin := domain.User{
-			NationalID: "1100700000002",
+			NationalID: "1100700009002",
 			Name:       "ขาจรทดสอบ",
 			Phone:      "0810000002",
 			Role:       domain.RoleWalkin,
 		}
 		staff := domain.User{
-			NationalID: "1100700000003",
+			NationalID: "1100700009003",
 			Name:       "เจ้าหน้าที่สมศรี",
 			Phone:      "0810000003",
 			Role:       domain.RoleStaff,
 		}
-		if err := tx.Create([]*domain.User{&regular, &walkin, &staff}).Error; err != nil {
+		users := append([]*domain.User{}, regulars...)
+		users = append(users, &walkin, &staff)
+		if err := tx.Create(&users).Error; err != nil {
 			return fmt.Errorf("create users: %w", err)
 		}
 
 		stalls := make([]domain.Stall, 0, 20)
-		for i := 1; i <= 12; i++ {
-			ownerID := regular.ID
+		for i := 1; i <= zoneAStalls; i++ {
+			ownerID := regulars[i-1].ID // แต่ละแผงเจ้าของคนละคน
 			stalls = append(stalls, domain.Stall{
 				Code:          fmt.Sprintf("A-%02d", i),
 				Zone:          "Zone A",
@@ -91,7 +99,7 @@ func SeedIfEmpty(db *gorm.DB) error {
 		}
 
 		log.Printf("seed complete: %d users, %d stalls, %d daily_bookings for %s",
-			3, len(stalls), len(bookings), today.Format("2006-01-02"))
+			len(users), len(stalls), len(bookings), today.Format("2006-01-02"))
 		return nil
 	})
 }
