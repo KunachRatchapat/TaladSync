@@ -99,6 +99,23 @@ func (r *BookingRepository) GetByStallAndDate(ctx context.Context, stallID uint,
 	return &booking, nil
 }
 
+// ListOwnedStallBookings หาแผงที่ vendor เป็น "เจ้าของถาวร" + daily_booking ของวันนั้น
+// ใช้ stalls.owner_vendor_id (ไม่ใช่ daily_bookings.vendor_id) เพราะ leave เคลียร์ vendor_id ทิ้ง
+func (r *BookingRepository) ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
+	date = timeutil.MarketDate(date)
+	var bookings []domain.DailyBooking
+	err := r.db.WithContext(ctx).
+		Preload("Stall").
+		Joins("JOIN stalls ON stalls.id = daily_bookings.stall_id").
+		Where("stalls.owner_vendor_id = ? AND daily_bookings.market_date = ?", vendorID, date).
+		Order("stalls.code ASC").
+		Find(&bookings).Error
+	if err != nil {
+		return nil, err
+	}
+	return bookings, nil
+}
+
 func (r *BookingRepository) TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
 	res := r.db.WithContext(ctx).

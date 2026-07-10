@@ -11,6 +11,7 @@ import (
 type VendorLeaveRepository interface {
 	GetByStallAndDate(ctx context.Context, stallID uint, date time.Time) (*domain.DailyBooking, error)
 	TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error)
+	ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error)
 }
 
 type AuditWriter interface {
@@ -24,6 +25,10 @@ type VendorUsecase struct {
 
 func NewVendorUsecase(bookings VendorLeaveRepository, audit AuditWriter) *VendorUsecase {
 	return &VendorUsecase{bookings: bookings, audit: audit}
+}
+
+func (u *VendorUsecase) GetMyStalls(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
+	return u.bookings.ListOwnedStallBookings(ctx, vendorID, date)
 }
 
 func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) error {

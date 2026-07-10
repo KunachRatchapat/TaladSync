@@ -21,6 +21,25 @@ type leaveRequest struct {
 	Date    string `json:"date,omitempty"`
 }
 
+func (h *VendorHandler) GetMine(c *fiber.Ctx) error {
+	claims, err := middleware.GetClaims(c)
+	if err != nil {
+		return RespondError(c, errUnauthorized)
+	}
+
+	date, err := parseMarketDate(c.Query("date"))
+	if err != nil {
+		return badRequest(c)
+	}
+
+	stalls, err := h.uc.GetMyStalls(c.Context(), claims.UserID, date)
+	if err != nil {
+		return RespondError(c, err)
+	}
+
+	return c.JSON(fiber.Map{"stalls": stalls})
+}
+
 func (h *VendorHandler) Leave(c *fiber.Ctx) error {
 	claims, err := middleware.GetClaims(c)
 	if err != nil {
