@@ -28,19 +28,18 @@ npm run dev
 
 ## 2. รีเซ็ตข้อมูลให้สะอาด (ก่อนเดโม)
 
-ถ้าเคยเทสจนแผงถูกจอง/แจ้งหยุดไปแล้ว อยากได้ข้อมูลสดใหม่:
+ถ้าเคยเทสจนแผงถูกจอง/แจ้งหยุดไปแล้ว อยากได้ข้อมูลสดใหม่ — **คำสั่งเดียว:**
 
 ```powershell
 # หยุด backend ก่อน (Ctrl+C ใน Terminal 1) แล้ว:
-$env:PGPASSWORD = "<DB_PASSWORD จาก backend/.env>"
-& "C:\Program Files\PostgreSQL\17\bin\psql" -h localhost -U postgres -d taladsync `
-  -c "TRUNCATE audit_logs, daily_bookings, stalls, users RESTART IDENTITY CASCADE;"
-
-# แล้วรัน backend ใหม่ → seed สดอัตโนมัติ
-go run ./cmd/api
+cd D:\taladsync\backend
+go run ./cmd/api -reseed     # ล้าง DB + seed สด แล้วออกเอง
+go run ./cmd/api             # เริ่ม server ปกติ
 ```
 
-หรือถ้าใช้ Docker: `docker compose down -v; docker compose up --build`
+> `-reseed` = TRUNCATE ทุกตาราง → seed ใหม่ (14 users, 20 แผง) → exit ([`Reseed` ใน seed.go](../backend/internal/database/seed.go))
+
+ทางเลือกอื่น: Docker → `docker compose down -v; docker compose up --build`
 
 ---
 

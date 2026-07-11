@@ -10,6 +10,20 @@ import (
 	"taladsync/internal/pkg/timeutil"
 )
 
+// Reseed ล้างทุกตารางแล้วใส่ข้อมูล dev สดใหม่ (สำหรับ flag -reseed / เดโม)
+func Reseed(db *gorm.DB) error {
+	if err := db.Exec(
+		"TRUNCATE audit_logs, daily_bookings, stalls, users RESTART IDENTITY CASCADE",
+	).Error; err != nil {
+		return fmt.Errorf("truncate: %w", err)
+	}
+	log.Println("reseed: tables truncated")
+	if err := SeedIfEmpty(db); err != nil {
+		return err
+	}
+	return SeedDailyBookingsForToday(db)
+}
+
 // SeedIfEmpty ใส่ข้อมูล dev เมื่อ users ว่างอยู่
 func SeedIfEmpty(db *gorm.DB) error {
 	var count int64
@@ -26,7 +40,7 @@ func SeedIfEmpty(db *gorm.DB) error {
 	const zoneAStalls = 12
 
 	return db.Transaction(func(tx *gorm.DB) error {
-		// แม่ค้าประจำหลายคน — 1 คน : 1 แผง (สมจริง; mock-login REGULAR = คนแรก เจ้าของ A-01)
+		
 		regulars := make([]*domain.User, zoneAStalls)
 		for i := 0; i < zoneAStalls; i++ {
 			regulars[i] = &domain.User{

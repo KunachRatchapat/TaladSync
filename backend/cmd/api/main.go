@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -19,6 +20,9 @@ import (
 )
 
 func main() {
+	reseed := flag.Bool("reseed", false, "ล้าง DB แล้วใส่ข้อมูล dev สดใหม่ แล้วออก (ไม่ start server)")
+	flag.Parse()
+
 	cfg := config.Load()
 
 	db, err := database.Connect(cfg.DatabaseURL)
@@ -28,6 +32,16 @@ func main() {
 	if err := database.Migrate(db); err != nil {
 		log.Fatal(err)
 	}
+
+	// go run ./cmd/api -reseed  → รีเซ็ตข้อมูลแล้วออก (สำหรับเดโม/dev)
+	if *reseed {
+		if err := database.Reseed(db); err != nil {
+			log.Fatal(err)
+		}
+		log.Println("reseed complete — exiting")
+		return
+	}
+
 	if err := database.SeedIfEmpty(db); err != nil {
 		log.Fatal(err)
 	}
