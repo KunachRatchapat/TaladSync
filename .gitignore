@@ -17,6 +17,3 @@ backend/.env
 # OS
 .DS_Store
 Thumbs.db
-
-docs/SYSTEM_DESIGN.md
-docs/BOOKING_FLOW.md

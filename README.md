@@ -11,9 +11,16 @@ A daily fresh-market stall management system that solves two core pain points:
 
 ## 🚧 Project Status
 
-> **Backend MVP complete (Phase 0–8).** All API endpoints, unit tests, concurrent integration test, and Docker Compose are implemented.
-> **Phase 8 not yet committed** — see file list in [`AGENTS.md`](AGENTS.md).
-> Frontend (Vue 3) is not started — see Product Phase 2 below.
+> **MVP complete.** Backend (Phase 0–8) and Frontend (F1–F4, all 4 pages) are implemented and merged to `main`.
+> Next up is **Product Phase 2** — LINE LIFF, stall map, financial tracking, PDPA (see below).
+
+| Area | Status |
+|------|--------|
+| Backend API + unit tests + concurrent integration test | ✅ |
+| Docker Compose (Postgres 17 + API) | ✅ |
+| Frontend — WALKIN / STAFF / REGULAR / Public directory | ✅ |
+
+See [`docs/DATABASE.md`](docs/DATABASE.md) for schema and concurrency details, and [`docs/DEMO.md`](docs/DEMO.md) for run + demo instructions.
 
 ---
 
@@ -24,7 +31,7 @@ A daily fresh-market stall management system that solves two core pain points:
 | Backend | Go 1.24 + Fiber v2 + GORM |
 | Database | PostgreSQL 17 |
 | Auth | JWT (mock login for MVP) → production: LINE LIFF |
-| Frontend | Vue 3 + Tailwind + Pinia *(not started)* |
+| Frontend | Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router |
 
 ---
 
@@ -42,15 +49,24 @@ handler → usecase → domain
 taladsync/
 ├── .env.example             # Docker Compose secrets template (copy → .env)
 ├── docker-compose.yml       # Postgres 17 + API
-└── backend/
-    ├── Dockerfile
-    ├── .dockerignore
-    ├── .env.example         # local go run (copy → backend/.env)
-    ├── cmd/api/main.go
-    └── internal/ ...
+├── backend/
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── .env.example         # local go run (copy → backend/.env)
+│   ├── cmd/api/main.go
+│   └── internal/ ...
+└── frontend/
+    ├── .env.example         # VITE_API_URL (copy → frontend/.env)
+    └── src/
+        ├── api/             # fetch client, auth, booking, directory
+        ├── stores/          # Pinia auth store (ensureRole + token)
+        ├── composables/     # useAvailableStalls, useBooking, useChecklist, ...
+        ├── components/      # AppHeader, StallCard, BookingModal, ...
+        ├── views/           # WalkinView, StaffView, RegularView, DirectoryView
+        └── router.ts
 ```
 
-**Two env files:** root `.env` for Docker; `backend/.env` for `go run` — keep `JWT_SECRET` in sync if using both.
+**Two backend env files:** root `.env` for Docker; `backend/.env` for `go run` — keep `JWT_SECRET` in sync if using both.
 
 ---
 
@@ -67,8 +83,9 @@ WHERE stall_id = ? AND market_date = ? AND status = 'AVAILABLE';
 - `RowsAffected = 1` → booking succeeded
 - `RowsAffected = 0` → someone got there first (HTTP 409)
 - Double-booking is blocked on two levels: the `WHERE` condition + a `UNIQUE(stall_id, market_date)` constraint
+- A **partial unique index** also enforces 1 active booking per vendor per day
 
-More detail: [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md)
+More detail: [`docs/DATABASE.md`](docs/DATABASE.md)
 
 ---
 
@@ -80,9 +97,11 @@ More detail: [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md)
 | POST | `/api/auth/mock-login` | public | ✅ |
 | GET | `/api/auth/me` | JWT | ✅ |
 | GET | `/api/stalls/available?date=` | WALKIN | ✅ |
+| GET | `/api/bookings/mine?date=` | WALKIN | ✅ |
 | POST | `/api/bookings` | WALKIN | ✅ |
-| POST | `/api/vendor/leave` | REGULAR | ✅|
-| GET | `/api/staff/checklist?date=` | STAFF | ✅|
+| GET | `/api/vendor/mine?date=` | REGULAR | ✅ |
+| POST | `/api/vendor/leave` | REGULAR | ✅ |
+| GET | `/api/staff/checklist?date=` | STAFF | ✅ |
 | POST | `/api/bookings/:id/attendance` | STAFF | ✅ |
 | GET | `/api/staff/summary?date=` | STAFF | ✅ |
 | GET | `/api/directory?q=` | public | ✅ |
@@ -91,7 +110,7 @@ More detail: [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md)
 
 ## 🚀 Running
 
-### Option A: Docker Compose (full stack)
+### Option A: Docker Compose (backend + DB)
 
 Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/). Stop local Postgres/API if ports `5432` / `8080` are already in use.
 
@@ -104,12 +123,12 @@ docker compose up --build
 # First run auto-seeds users, stalls, daily_bookings
 ```
 
-Stop: `docker compose down`  
+Stop: `docker compose down`
 Reset DB (e.g. after changing `POSTGRES_PASSWORD`): `docker compose down -v` then `up --build` again
 
 **Troubleshooting:** `password authentication failed for user "postgres"` — volume was initialized with an old password. Run `docker compose down -v` and start fresh, or set `.env` password to match the existing volume.
 
-### Option B: Local dev (go run)
+### Option B: Local backend (go run)
 
 ```powershell
 # 1. Set up environment
@@ -125,6 +144,33 @@ go run ./cmd/api
 # GET http://localhost:8080/health  →  {"status":"ok"}
 ```
 
+Wipe and reseed fresh dev data in one shot (for demos), then exit without starting the server:
+
+```powershell
+cd backend
+go run ./cmd/api -reseed
+```
+
+### Frontend (Vue 3)
+
+```powershell
+cd frontend
+copy .env.example .env        # VITE_API_URL=http://localhost:8080
+npm install
+npm run dev                   # http://localhost:5173
+```
+
+The frontend has four pages, one per role:
+
+| Route | Role | What it does |
+|-------|------|--------------|
+| `/` | WALKIN | Auto mock-login, list available pool stalls, booking form (409 in Thai), booked-today card |
+| `/staff` | STAFF | Roll-call checklist with progress + present/absent toggle, client-side summary |
+| `/regular` | REGULAR | View owned stall(s) + report leave (confirm modal, optimistic update) |
+| `/directory` | public | Search shops (debounced, no login, no PII) |
+
+> **Dev nav:** a dev-only pill in `App.vue` (gated by `import.meta.env.DEV`) switches between the four pages. Make sure the API is running the latest build so `/vendor/mine` and `/directory` are available.
+
 ### Testing with Mock Login
 
 ```json
@@ -132,7 +178,7 @@ POST /api/auth/mock-login
 { "role": "WALKIN" }
 ```
 
-Available roles: `REGULAR` | `WALKIN` | `STAFF`  
+Available roles: `REGULAR` | `WALKIN` | `STAFF`
 Send the returned token in the header: `Authorization: Bearer <token>`
 
 ### Booking flow (WALKIN)
@@ -145,7 +191,7 @@ Send the returned token in the header: `Authorization: Bearer <token>`
 { "stallId": 13, "shopName": "ร้านทด", "productType": "ผลไม้" }
 ```
 
-Returns `201` on success, `409` if the stall was taken or vendor already booked today.
+Returns `201` on success, `409` if the stall was taken or the vendor already booked today.
 
 ### Tests
 
@@ -163,13 +209,14 @@ go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
 
 ## 📚 Documentation
 
-- [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — overview, stack, schema
-- [`docs/BOOKING_FLOW.md`](docs/BOOKING_FLOW.md) — state machine, transactions, concurrent test
-- [`AGENTS.md`](AGENTS.md) — development status + remaining work
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema, state machine, concurrency (conditional UPDATE)
+- [`docs/DEMO.md`](docs/DEMO.md) — run, demo script, `-reseed` reset
 
 ---
 
-## 🗺 Roadmap (backend MVP)
+## 🗺 Roadmap
+
+### Backend MVP
 
 | Phase | Status | Goal |
 |-------|--------|------|
@@ -181,15 +228,20 @@ go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
 | 7 | ✅ | Concurrent load test (testcontainers) |
 | 8 | ✅ | Docker Compose (Postgres + API, secrets via `.env`) |
 
-### Phase 8 files (pending commit)
+### Frontend MVP
 
-- `docker-compose.yml`, `backend/Dockerfile`, `backend/.dockerignore`, `.env.example`
+| Phase | Status | Goal |
+|-------|--------|------|
+| F1 | ✅ | WALKIN — available stalls + booking |
+| F2 | ✅ | STAFF — roll-call checklist + summary |
+| F3 | ✅ | REGULAR — my stalls + leave |
+| F4 | ✅ | Public directory search |
 
-## 🗺 Product Phase 2 (later)
+### Product Phase 2 (later)
 
 - Real LINE LIFF / Push notifications (Flash Drop)
+- Stall map (posX / posY layout)
 - Day-off quotas, emergency leave, long leave + approval
 - Force Absent + automatic release of no-show stalls
 - Financial tracking (stall-fee totals for treasury reporting)
 - `national_id` encryption (PDPA compliance)
-- Vue 3 frontend
