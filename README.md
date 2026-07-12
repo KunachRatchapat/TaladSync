@@ -20,7 +20,7 @@ A daily fresh-market stall management system that solves two core pain points:
 | Docker Compose (Postgres 17 + API) | ✅ |
 | Frontend — WALKIN / STAFF / REGULAR / Public directory | ✅ |
 
-See [`docs/DATABASE.md`](docs/DATABASE.md) for schema and concurrency details, and [`docs/DEMO.md`](docs/DEMO.md) for run + demo instructions.
+See [`AGENTS.md`](AGENTS.md) for the development log and conventions. Technical deep-dive: [`docs/DATABASE.md`](docs/DATABASE.md), [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md), [`docs/DEMO.md`](docs/DEMO.md).
 
 ---
 
@@ -209,7 +209,10 @@ go test -tags=integration ./internal/usecase/... -v -run Concurrent -count=1
 
 ## 📚 Documentation
 
-- [`docs/DATABASE.md`](docs/DATABASE.md) — schema, state machine, concurrency (conditional UPDATE)
+- [`AGENTS.md`](AGENTS.md) — dev log, conventions, file map (Cursor / multi-model AI)
+- [`CLAUDE.md`](CLAUDE.md) — quick reference for Claude Code
+- [`docs/SYSTEM_DESIGN.md`](docs/SYSTEM_DESIGN.md) — architecture overview, stack, schema
+- [`docs/DATABASE.md`](docs/DATABASE.md) — schema + concurrency (conditional UPDATE)
 - [`docs/DEMO.md`](docs/DEMO.md) — run, demo script, `-reseed` reset
 
 ---
