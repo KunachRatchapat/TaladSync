@@ -37,7 +37,10 @@ func SeedIfEmpty(db *gorm.DB) error {
 
 	today := timeutil.Today()
 
-	const zoneAStalls = 12
+	const (
+		zoneAStalls = 15 // โซน A — แผงแม่ค้าประจำ (1 คน : 1 แผง)
+		zoneBStalls = 15 // โซน B — แผงกลาง ว่างให้ขาจรจอง
+	)
 
 	return db.Transaction(func(tx *gorm.DB) error {
 		
@@ -68,21 +71,22 @@ func SeedIfEmpty(db *gorm.DB) error {
 			return fmt.Errorf("create users: %w", err)
 		}
 
-		stalls := make([]domain.Stall, 0, 20)
+		stalls := make([]domain.Stall, 0, zoneAStalls+zoneBStalls)
 		for i := 1; i <= zoneAStalls; i++ {
 			ownerID := regulars[i-1].ID // แต่ละแผงเจ้าของคนละคน
 			stalls = append(stalls, domain.Stall{
 				Code:          fmt.Sprintf("A-%02d", i),
-				Zone:          "Zone A",
+				Zone:          "โซน A",
 				OwnerVendorID: &ownerID,
 				PosX:          float64(i),
 				PosY:          1,
 			})
 		}
-		for i := 1; i <= 8; i++ {
+		// โซน B ไม่มีเจ้าของ → daily_booking เป็น AVAILABLE ให้ขาจรจอง
+		for i := 1; i <= zoneBStalls; i++ {
 			stalls = append(stalls, domain.Stall{
-				Code:  fmt.Sprintf("P-%02d", i),
-				Zone:  "Pool",
+				Code:  fmt.Sprintf("B-%02d", i),
+				Zone:  "โซน B",
 				PosX:  float64(i),
 				PosY:  2,
 			})
