@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"taladsync/internal/domain"
@@ -15,11 +16,12 @@ type BookingRepository interface {
 }
 
 type BookingUsecase struct {
-	repo BookingRepository
+	repo  BookingRepository
+	audit AuditWriter
 }
 
-func NewBookingUsecase(repo BookingRepository) *BookingUsecase {
-	return &BookingUsecase{repo: repo}
+func NewBookingUsecase(repo BookingRepository, audit AuditWriter) *BookingUsecase {
+	return &BookingUsecase{repo: repo, audit: audit}
 }
 
 func (u *BookingUsecase) ListAvailable(ctx context.Context, date time.Time) ([]domain.DailyBooking, error) {
@@ -42,7 +44,25 @@ func (u *BookingUsecase) BookStall(ctx context.Context, in domain.BookStallInput
 	if rows == 0 {
 		return domain.ErrStallNotAvailable
 	}
-	return nil
+
+	booking, err := u.repo.FindVendorBookedToday(ctx, in.VendorID, in.MarketDate)
+	if err != nil {
+		return err
+	}
+	detail := fmt.Sprintf("stallId=%d shop=%s", in.StallID, in.ShopName)
+	var bookingID *uint
+	if booking != nil {
+		bookingID = &booking.ID
+		if booking.Stall != nil {
+			detail = fmt.Sprintf("stall=%s shop=%s", booking.Stall.Code, in.ShopName)
+		}
+	}
+	return u.audit.Create(ctx, domain.AuditLog{
+		ActorUserID:    in.VendorID,
+		DailyBookingID: bookingID,
+		Action:         domain.AuditBook,
+		Detail:         detail,
+	})
 }
 
 func (u *BookingUsecase) GetMyBookingToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {

@@ -28,6 +28,7 @@ const (
 )
 
 const (
+	AuditBook    = "BOOK"
 	AuditLeave   = "LEAVE"
 	AuditCheckin = "CHECKIN"
 	AuditNoshow  = "NOSHOW"

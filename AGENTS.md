@@ -43,7 +43,7 @@
 ### Next session — ทำได้เลย (ไม่ต้องรอดีไซน์)
 
 1. **Vitest test ตัวแรก** — frontend ยังไม่มี test (ปิดจุดอ่อนตอนสัมภาษณ์ + อยู่ใน roadmap)
-2. **BOOK audit** — ตอนจองยังไม่เขียน `audit_logs` (มีแต่ LEAVE/CHECKIN/NOSHOW)
+2. ~~**BOOK audit**~~ — **DONE**: จองสำเร็จเขียน `audit_logs` action `BOOK` แล้ว (ครบทั้ง BOOK/LEAVE/CHECKIN/NOSHOW)
 3. **CI/CD** — GitHub Actions รัน `go test` + `npm run type-check` ทุก push
 4. **Deploy จริง** — Railway/Render → มี URL ใส่ resume
 5. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
@@ -147,7 +147,7 @@ frontend/
 ### Backend optional polish (ไม่ block F2)
 
 1. ~~Seed daily bookings for today~~ — **DONE**
-2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
+2. ~~**BOOK audit**~~ — **DONE**: `BookStall` เขียน `audit_logs` action `BOOK` หลังจองสำเร็จ
 
 ### DONE — Backend (มีไฟล์แล้ว)
 
@@ -170,7 +170,7 @@ frontend/
 ### TODO
 
 - **merge `directory-frontend` → `main`** (F4 พร้อม) + push
-- Backend polish: BOOK audit
+- ~~Backend polish: BOOK audit~~ — **DONE**
 - **Product Phase 2** — LINE LIFF, map (posX/posY), financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
@@ -264,7 +264,9 @@ CheckedAt        *time.Time
 - Business error อยู่ใน `internal/domain/errors.go`; **handler** เป็นที่เดียวที่ map → HTTP status
 - `national_id` = PII: ห้าม return ออก public API (`json:"-"`); production ต้อง encrypt
 - Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
-- Audit: `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` (MVP; `BOOK` ยังไม่เขียน)
+- Audit: `BOOK`, `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` ครบทุก state transition แล้ว
+  - **Known limitation (MVP):** audit อยู่บน critical path — ถ้า `audit.Create` fail หลังจองสำเร็จ request จะได้ error ทั้งที่แผงถูกจองแล้ว (consistent กับ `vendor.Leave`/`staff` ทั้งระบบ ไม่มี tx ครอบ)
+  - `BookStall` ยิง `FindVendorBookedToday` เพิ่ม 1 query เพื่อดึง detail ของ audit — optimize ได้ถ้าให้ `TryBookStall` คืน booking กลับมา
 - `parseMarketDate` ใน `handler/date.go` — query/body `date` ว่าง = วันนี้ Bangkok; ใช้ร่วม list/book/leave/checklist
 
 ## API (MVP — implemented vs TODO)
