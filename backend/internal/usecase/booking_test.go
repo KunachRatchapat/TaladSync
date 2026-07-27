@@ -46,7 +46,8 @@ func (m *mockBookingRepo) FindVendorBookedToday(ctx context.Context, vendorID ui
 
 func TestBookStall_Success(t *testing.T) {
 	repo := &mockBookingRepo{countToday: 0, tryRows: 1}
-	uc := NewBookingUsecase(repo)
+	audit := &mockAuditWriter{}
+	uc := NewBookingUsecase(repo, audit)
 
 	in := domain.BookStallInput{
 		StallID: 13, VendorID: 2,
@@ -63,11 +64,17 @@ func TestBookStall_Success(t *testing.T) {
 	if repo.lastTryBookInput.StallID != 13 || repo.lastTryBookInput.VendorID != 2 {
 		t.Fatalf("unexpected TryBookStall input: %+v", repo.lastTryBookInput)
 	}
+	if len(audit.logs) != 1 || audit.logs[0].Action != domain.AuditBook {
+		t.Fatalf("expected BOOK audit, got %+v", audit.logs)
+	}
+	if audit.logs[0].ActorUserID != 2 {
+		t.Fatalf("expected actor=2, got %d", audit.logs[0].ActorUserID)
+	}
 }
 
 func TestBookStall_AlreadyHasStall(t *testing.T) {
 	repo := &mockBookingRepo{countToday: 1}
-	uc := NewBookingUsecase(repo)
+	uc := NewBookingUsecase(repo, &mockAuditWriter{})
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{
 		StallID: 13, VendorID: 2, MarketDate: time.Now(),
@@ -82,7 +89,7 @@ func TestBookStall_AlreadyHasStall(t *testing.T) {
 
 func TestBookStall_StallNotAvailable(t *testing.T) {
 	repo := &mockBookingRepo{countToday: 0, tryRows: 0}
-	uc := NewBookingUsecase(repo)
+	uc := NewBookingUsecase(repo, &mockAuditWriter{})
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{
 		StallID: 13, VendorID: 2, MarketDate: time.Now(),
@@ -97,7 +104,7 @@ func TestBookStall_StallNotAvailable(t *testing.T) {
 
 func TestBookStall_AlreadyHasStall_UniqueViolation(t *testing.T) {
 	repo := &mockBookingRepo{countToday: 0, tryErr: domain.ErrAlreadyHasStall}
-	uc := NewBookingUsecase(repo)
+	uc := NewBookingUsecase(repo, &mockAuditWriter{})
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{
 		StallID: 13, VendorID: 2, MarketDate: time.Now(),

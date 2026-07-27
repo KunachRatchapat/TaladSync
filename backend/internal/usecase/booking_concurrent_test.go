@@ -128,7 +128,7 @@ func TestBookStall_Concurrent_OnlyOneWins(t *testing.T) {
 	db := setupTestDB(t)
 	fx := seedConcurrentFixture(t, db)
 
-	uc := NewBookingUsecase(repository.NewBookingRepository(db))
+	uc := NewBookingUsecase(repository.NewBookingRepository(db), repository.NewAuditRepository(db))
 	ctx := context.Background()
 
 	var wg sync.WaitGroup

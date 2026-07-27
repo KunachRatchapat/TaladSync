@@ -13,17 +13,40 @@
 
 ## Implementation Checkpoint (อัปเดตล่าสุด)
 
-**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1–F4 DONE (MVP ครบ 4 หน้า)**. ถัดไป **Product Phase 2**
+**สถานะรวม:** Backend MVP **Phase 0–8 DONE**. Frontend **F1–F4 DONE** (merged → `main`).
+**กำลังทำ: UI redesign บน branch `bookingvendor`** (push แล้ว)
 
-- F1–F4 merged → `main`
-- `ensureWalkin` → refactor เป็น `ensureRole(role)` แล้ว (auth store เก็บ role คู่ token กัน 403 ข้าม role)
-- **DevNav** — pill สลับ 4 หน้า (dev only, gate `import.meta.env.DEV`) ใน `App.vue`
+- `ensureWalkin` → refactor เป็น `ensureRole(role)` (auth store เก็บ role คู่ token กัน 403 ข้าม role)
+- **DevNav ถูกลบแล้ว** (commit `9698a12`) — เข้าแต่ละหน้าด้วย URL ตรงๆ (`/`, `/staff`, `/regular`, `/directory`)
 
-### Next session
+### 🎨 UI Redesign — branch `bookingvendor` (กำลังทำ)
 
-1. **Product Phase 2** — LINE LIFF, map (posX/posY), financial, PDPA
-2. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
-3. Backend polish: BOOK audit
+เพื่อนทำ UX/UI ออกแบบให้ · ทำ**ทีละ component** แล้วให้ user review ก่อน commit
+
+**เสร็จแล้ว** (commit `5cce091`):
+
+| ไฟล์ | ทำอะไร |
+|------|--------|
+| `components/PageHeader.vue` 🆕 | header ตามดีไซน์: ปุ่ม `<` (absolute ซ้าย) + title กลางจอ · emit `back` |
+| `views/WalkinView.vue` | list → **กริด 3 คอลัมน์ แบ่งตามโซน** (`computed stallsByZone`) + พื้นหลัง `bg-brand-50` |
+| `components/StallCard.vue` | list row → **การ์ดกริด** 3 สถานะ (ว่าง / selected / disabled) |
+| `database/seed.go` | **โซน A (A-01..A-15 มีเจ้าของ) + โซน B (B-01..B-15 ว่าง)** แทน Zone A + Pool เดิม |
+
+**⚠️ สำคัญ:** `AppHeader.vue` **ยังใช้อยู่** ในอีก 3 หน้า (staff/regular/directory) — **ห้ามลบ** จนกว่าจะ redesign ครบทุกหน้า
+
+**🔴 ติดรอดีไซน์จากเพื่อน (ทำต่อไม่ได้):**
+1. **Flow การจอง** — กดแผงแล้วเกิดอะไร? (เลือกก่อนค่อยกดปุ่ม vs เด้ง modal ทันที) · ตอนนี้คงของเดิม = กดแล้วเด้ง `BookingModal`
+2. **สถานะ "เลือกแล้ว"** หน้าตายังไง (ตอนนี้เดาไว้: `bg-brand-50` + `ring-2 ring-brand-500`)
+3. **ปุ่ม "จองแผง"** ข้างล่าง (ขึ้นกับข้อ 1)
+4. ดีไซน์อีก 3 หน้า + `BookingModal`
+
+### Next session — ทำได้เลย (ไม่ต้องรอดีไซน์)
+
+1. **Vitest test ตัวแรก** — frontend ยังไม่มี test (ปิดจุดอ่อนตอนสัมภาษณ์ + อยู่ใน roadmap)
+2. ~~**BOOK audit**~~ — **DONE**: จองสำเร็จเขียน `audit_logs` action `BOOK` แล้ว (ครบทั้ง BOOK/LEAVE/CHECKIN/NOSHOW)
+3. **CI/CD** — GitHub Actions รัน `go test` + `npm run type-check` ทุก push
+4. **Deploy จริง** — Railway/Render → มี URL ใส่ resume
+5. ใช้ design guidance ใน `frontend/SKILL.md` ตอนสร้าง UI ใหม่
 
 ### Backend เพิ่มระหว่าง F1 (commit แล้ว `59eced9`)
 
@@ -124,7 +147,7 @@ frontend/
 ### Backend optional polish (ไม่ block F2)
 
 1. ~~Seed daily bookings for today~~ — **DONE**
-2. **BOOK audit** — retroactive `audit_logs` ตอนจอง
+2. ~~**BOOK audit**~~ — **DONE**: `BookStall` เขียน `audit_logs` action `BOOK` หลังจองสำเร็จ
 
 ### DONE — Backend (มีไฟล์แล้ว)
 
@@ -147,7 +170,7 @@ frontend/
 ### TODO
 
 - **merge `directory-frontend` → `main`** (F4 พร้อม) + push
-- Backend polish: BOOK audit
+- ~~Backend polish: BOOK audit~~ — **DONE**
 - **Product Phase 2** — LINE LIFF, map (posX/posY), financial, PDPA (ดู section ท้ายไฟล์)
 
 ---
@@ -241,7 +264,9 @@ CheckedAt        *time.Time
 - Business error อยู่ใน `internal/domain/errors.go`; **handler** เป็นที่เดียวที่ map → HTTP status
 - `national_id` = PII: ห้าม return ออก public API (`json:"-"`); production ต้อง encrypt
 - Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
-- Audit: `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` (MVP; `BOOK` ยังไม่เขียน)
+- Audit: `BOOK`, `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` ครบทุก state transition แล้ว
+  - **Known limitation (MVP):** audit อยู่บน critical path — ถ้า `audit.Create` fail หลังจองสำเร็จ request จะได้ error ทั้งที่แผงถูกจองแล้ว (consistent กับ `vendor.Leave`/`staff` ทั้งระบบ ไม่มี tx ครอบ)
+  - `BookStall` ยิง `FindVendorBookedToday` เพิ่ม 1 query เพื่อดึง detail ของ audit — optimize ได้ถ้าให้ `TryBookStall` คืน booking กลับมา
 - `parseMarketDate` ใน `handler/date.go` — query/body `date` ว่าง = วันนี้ Bangkok; ใช้ร่วม list/book/leave/checklist
 
 ## API (MVP — implemented vs TODO)

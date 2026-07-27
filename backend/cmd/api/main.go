@@ -55,10 +55,9 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUC)
 
 	bookingRepo := repository.NewBookingRepository(db)
-	bookingUC := usecase.NewBookingUsecase(bookingRepo)
-	bookingHandler := handler.NewBookingHandler(bookingUC)
-
 	auditRepo := repository.NewAuditRepository(db)
+	bookingUC := usecase.NewBookingUsecase(bookingRepo, auditRepo)
+	bookingHandler := handler.NewBookingHandler(bookingUC)
 	vendorUC := usecase.NewVendorUsecase(bookingRepo, auditRepo)
 	vendorHandler := handler.NewVendorHandler(vendorUC)
 	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
@@ -89,7 +88,6 @@ func main() {
 
 	protected := api.Group("/auth", authMW)
 	protected.Get("/me", authHandler.Me)
-
 
 	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
 	api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.GetMine)

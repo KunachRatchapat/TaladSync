@@ -8,7 +8,7 @@ Daily fresh-market stall manager. Solves two pain points: **walk-in booking race
 
 - **Backend:** Go 1.24 + Fiber v2 + GORM + PostgreSQL 17 — `backend/`, Clean Architecture (`handler → usecase → domain`, `repository` implements usecase interfaces).
 - **Frontend:** Vue 3 + Vite + TypeScript + Tailwind + Pinia + Vue Router — `frontend/`. Four role pages: `/` WALKIN, `/staff` STAFF, `/regular` REGULAR, `/directory` public.
-- **Status:** Backend Phase 0–8 done; Frontend F1–F4 done; all merged to `main`. Next = Product Phase 2 (LINE LIFF, map, financial, PDPA).
+- **Status:** Backend Phase 0–8 done; Frontend F1–F4 done, merged to `main`. **Active work: UI redesign on branch `bookingvendor`** (designer-led, one component at a time) — see the UI Redesign section in [AGENTS.md](AGENTS.md) for what's done and what's blocked on designs.
 
 ## Common commands
 
@@ -33,6 +33,9 @@ docker compose up --build               # Postgres 17 + API on :8080
 - **Booking concurrency:** `TryBookStall` uses conditional `UPDATE ... WHERE status='AVAILABLE'`; success = `RowsAffected == 1`, not app-level mutex.
 - **Two env files:** root `.env` for Docker Compose; `backend/.env` for `go run` — keep `JWT_SECRET` in sync if using both.
 - **Vendor mine:** query by `stalls.owner_vendor_id`, not `daily_bookings.vendor_id` (cleared on leave).
+- **Two headers coexist during redesign:** `PageHeader.vue` (new design, WalkinView only) vs `AppHeader.vue` (still used by staff/regular/directory) — do not delete `AppHeader` until every page is redesigned.
+- **Zones:** seed now creates **โซน A** (owned by regulars) + **โซน B** (unowned, walk-in pool). `/api/stalls/available` only returns AVAILABLE rows, so โซน A appears only after a regular calls leave.
+- **Workflow:** user reviews each change before committing — make the edit, then stop and report; do not commit or push unless asked.
 - Match surrounding style. Backend comments and AGENTS.md are partly Thai — mirror the file you're editing.
 - After finishing meaningful work, update the checkpoint section in `AGENTS.md`.
 
