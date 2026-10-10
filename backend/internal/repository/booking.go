@@ -35,17 +35,12 @@ func (r *BookingRepository) ListAvailable(ctx context.Context, date time.Time) (
 
 func (r *BookingRepository) TryBookStall(ctx context.Context, in domain.BookStallInput) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("stall_id = ? AND market_date = ? AND status = ?",
-			in.StallID, date, domain.StatusAvailable).
-		Updates(map[string]interface{}{
-			"status":       domain.StatusBooked,
-			"vendor_id":    in.VendorID,
-			"shop_name":    in.ShopName,
-			"product_type": in.ProductType,
-			"booked_at":    timeutil.Now(),
-		})
+	res := r.db.WithContext(ctx).Exec(`
+	UPDATE daily_bookings
+	SET status = ?, vendor_id = ?, shop_name = ?, product_type = ?, booked_at = ?
+	WHERE stall_id = ? AND market_date = ? AND status = ?
+	`, domain.StatusBooked, in.VendorID, in.ShopName, in.ProductType, timeutil.Now(), in.StallID, date, domain.StatusAvailable,
+	)
 	if res.Error != nil {
 		if isDuplicateKey(res.Error) {
 			return 0, domain.ErrAlreadyHasStall
@@ -99,7 +94,6 @@ func (r *BookingRepository) GetByStallAndDate(ctx context.Context, stallID uint,
 	return &booking, nil
 }
 
-
 func (r *BookingRepository) ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
 	date = timeutil.MarketDate(date)
 	var bookings []domain.DailyBooking
@@ -133,7 +127,6 @@ func (r *BookingRepository) TryLeaveStall(ctx context.Context, in domain.LeaveSt
 	return res.RowsAffected, nil
 }
 
-
 func (r *BookingRepository) FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error) {
 	var booking domain.DailyBooking
 	err := r.db.WithContext(ctx).Preload("Stall").First(&booking, id).Error
@@ -161,7 +154,7 @@ func (r *BookingRepository) ListChecklist(ctx context.Context, date time.Time) (
 	return bookings, nil
 }
 
-//เช็คว่ามาไหม
+// เช็คว่ามาไหม
 func (r *BookingRepository) SetAttendance(
 	ctx context.Context,
 	bookingID, staffID uint,
@@ -172,9 +165,9 @@ func (r *BookingRepository) SetAttendance(
 		Model(&domain.DailyBooking{}).
 		Where("id = ? AND attendance != ?", bookingID, attendance).
 		Updates(map[string]interface{}{
-			"attendance":           attendance,
+			"attendance":          attendance,
 			"checked_by_staff_id": staffID,
-			"checked_at":           checkedAt,
+			"checked_at":          checkedAt,
 		})
 	return res.RowsAffected, res.Error
 }

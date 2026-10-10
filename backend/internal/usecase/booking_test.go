@@ -21,6 +21,8 @@ type mockBookingRepo struct {
 	lastTryBookInput   domain.BookStallInput
 	lastCountVendorID  uint
 	lastCountDate      time.Time
+	findBooking        *domain.DailyBooking 
+	findBookingErr     error                
 }
 
 func (m *mockBookingRepo) ListAvailable(ctx context.Context, date time.Time) ([]domain.DailyBooking, error) {
@@ -41,7 +43,7 @@ func (m *mockBookingRepo) CountVendorBookingToday(ctx context.Context, vendorID 
 }
 
 func (m *mockBookingRepo) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
-	return nil, nil
+	return m.findBooking, m.findBookingErr
 }
 
 func TestBookStall_Success(t *testing.T) {

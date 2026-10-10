@@ -33,7 +33,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// go run ./cmd/api -reseed  → รีเซ็ตข้อมูลแล้วออก (สำหรับเดโม/dev)
 	if *reseed {
 		if err := database.Reseed(db); err != nil {
 			log.Fatal(err)
