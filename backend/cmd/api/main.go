@@ -76,9 +76,11 @@ func main() {
 		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
 	}))
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
-	})
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.Get("/health", handler.NewHealthHandler(sqlDB).Check)
 
 	api := app.Group("/api")
 	api.Post("/auth/mock-login", authHandler.MockLogin)
