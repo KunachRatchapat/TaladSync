@@ -30,7 +30,7 @@ docker compose up --build               # Postgres 17 + API on :8080
 ## Critical gotchas
 
 - **Route wiring:** do not use multiple `api.Group("")` with different `RequireRoles` — Fiber merges middleware; staff routes can get WALKIN-only 403. Wire `RequireRoles` per route (see `cmd/api/main.go`).
-- **Booking concurrency:** `TryBookStall` uses conditional `UPDATE ... WHERE status='AVAILABLE'`; success = `RowsAffected == 1`, not app-level mutex.
+- **Booking concurrency:** `BookStallWithAudit` (repository) runs a conditional `UPDATE ... WHERE status='AVAILABLE' RETURNING id` and the BOOK audit insert in one transaction; success = 1 returned row, not app-level mutex. `vendor.Leave` / `staff.MarkAttendance` still write audit outside a transaction.
 - **Two env files:** root `.env` for Docker Compose; `backend/.env` for `go run` — keep `JWT_SECRET` in sync if using both.
 - **Vendor mine:** query by `stalls.owner_vendor_id`, not `daily_bookings.vendor_id` (cleared on leave).
 - **Two headers coexist during redesign:** `PageHeader.vue` (new design, WalkinView only) vs `AppHeader.vue` (still used by staff/regular/directory) — do not delete `AppHeader` until every page is redesigned.

@@ -265,8 +265,8 @@ CheckedAt        *time.Time
 - `national_id` = PII: ห้าม return ออก public API (`json:"-"`); production ต้อง encrypt
 - Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
 - Audit: `BOOK`, `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` ครบทุก state transition แล้ว
-  - **Known limitation (MVP):** audit อยู่บน critical path — ถ้า `audit.Create` fail หลังจองสำเร็จ request จะได้ error ทั้งที่แผงถูกจองแล้ว (consistent กับ `vendor.Leave`/`staff` ทั้งระบบ ไม่มี tx ครอบ)
-  - `BookStall` ยิง `FindVendorBookedToday` เพิ่ม 1 query เพื่อดึง detail ของ audit — optimize ได้ถ้าให้ `TryBookStall` คืน booking กลับมา
+  - **BOOK:** `BookStallWithAudit` ทำ UPDATE + เขียน audit ใน transaction เดียว — audit พัง = rollback การจองด้วย · ใช้ `RETURNING id` เลยไม่ต้อง query ซ้ำ
+  - **Known limitation:** `vendor.Leave` และ `staff.MarkAttendance` ยังเขียน audit นอก transaction (ถ้า audit พังหลังอัปเดตสำเร็จ request จะได้ error ทั้งที่ข้อมูลเปลี่ยนแล้ว)
 - `parseMarketDate` ใน `handler/date.go` — query/body `date` ว่าง = วันนี้ Bangkok; ใช้ร่วม list/book/leave/checklist
 
 ## API (MVP — implemented vs TODO)

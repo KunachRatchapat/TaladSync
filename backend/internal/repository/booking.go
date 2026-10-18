@@ -25,31 +25,46 @@ func (r *BookingRepository) ListAvailable(ctx context.Context, date time.Time) (
 	var bookings []domain.DailyBooking
 	err := r.db.WithContext(ctx).
 		Preload("Stall").
-		Where("market_date = ? AND status = ?", date, domain.StatusAvailable).
-		Find(&bookings).Error
+		Where("market_date = ? AND status = ?", date, domain.StatusAvailable).Find(&bookings).Error
 	if err != nil {
 		return nil, err
 	}
 	return bookings, nil
 }
 
-func (r *BookingRepository) TryBookStall(ctx context.Context, in domain.BookStallInput) (int64, error) {
+func (r *BookingRepository) BookStallWithAudit(ctx context.Context, in domain.BookStallInput, log domain.AuditLog) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
-	res := r.db.WithContext(ctx).Exec(`
+	var bookedIDs []uint
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Raw(`
 	UPDATE daily_bookings
 	SET status = ?, vendor_id = ?, shop_name = ?, product_type = ?, booked_at = ?
 	WHERE stall_id = ? AND market_date = ? AND status = ?
+	RETURNING id
 	`, domain.StatusBooked, in.VendorID, in.ShopName, in.ProductType, timeutil.Now(), in.StallID, date, domain.StatusAvailable,
-	)
-	if res.Error != nil {
-		if isDuplicateKey(res.Error) {
+		).Scan(&bookedIDs).Error
+		if err != nil {
+			return err
+		}
+
+		if len(bookedIDs) == 0 {
+			return nil
+		}
+
+		log.DailyBookingID = &bookedIDs[0]
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		if isDuplicateKey(err) {
 			return 0, domain.ErrAlreadyHasStall
 		}
-		return 0, res.Error
+		return 0, err
 	}
-	return res.RowsAffected, nil
+	return int64(len(bookedIDs)), nil
 }
 
+//Check ว่าจองไปกี่แผงแล้วนะ
 func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error) {
 	date = timeutil.MarketDate(date)
 	var count int64
@@ -60,6 +75,7 @@ func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorI
 		Count(&count).Error
 	return count, err
 }
+
 
 func (r *BookingRepository) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
 	date = timeutil.MarketDate(date)
