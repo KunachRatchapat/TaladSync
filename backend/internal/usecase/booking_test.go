@@ -75,8 +75,29 @@ func TestBookStall_Success(t *testing.T) {
 	}
 }
 
+func TestBookStall_RetrySameStall(t *testing.T) {
+	repo := &mockBookingRepo{
+		countToday:  1,
+		findBooking: &domain.DailyBooking{StallID: 13, Status: domain.StatusBooked},
+	}
+	uc := NewBookingUsecase(repo)
+
+	err := uc.BookStall(context.Background(), domain.BookStallInput{
+		StallID: 13, VendorID: 2, MarketDate: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil on retry of the same stall, got %v", err)
+	}
+	if repo.tryBookCalled {
+		t.Fatal("BookStallWithAudit should not be called on retry")
+	}
+}
+
 func TestBookStall_AlreadyHasStall(t *testing.T) {
-	repo := &mockBookingRepo{countToday: 1}
+	repo := &mockBookingRepo{
+		countToday:  1,
+		findBooking: &domain.DailyBooking{StallID: 14, Status: domain.StatusBooked},
+	}
 	uc := NewBookingUsecase(repo)
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{

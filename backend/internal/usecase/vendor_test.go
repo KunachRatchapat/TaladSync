@@ -142,3 +142,42 @@ func TestLeave_WrongStatus(t *testing.T) {
 		t.Fatalf("expected ErrLeaveNotAllowed, got %v", err)
 	}
 }
+
+func TestLeave_RetryAfterLeft(t *testing.T) {
+	ownerID := uint(1)
+	repo := &mockVendorRepo{
+		booking: &domain.DailyBooking{
+			ID: 10, StallID: 1, Status: domain.StatusAvailable,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &ownerID},
+		},
+	}
+	uc := NewVendorUsecase(repo)
+
+	err := uc.Leave(context.Background(), domain.LeaveStallInput{
+		StallID: 1, VendorID: 1, MarketDate: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("expected nil on retry after leaving, got %v", err)
+	}
+	if repo.tryCalled {
+		t.Fatal("LeaveStallWithAudit should not be called on retry")
+	}
+}
+
+func TestLeave_OtherOwnerAlreadyLeft(t *testing.T) {
+	ownerID := uint(2)
+	repo := &mockVendorRepo{
+		booking: &domain.DailyBooking{
+			ID: 11, StallID: 2, Status: domain.StatusAvailable,
+			Stall: &domain.Stall{Code: "A-02", OwnerVendorID: &ownerID},
+		},
+	}
+	uc := NewVendorUsecase(repo)
+
+	err := uc.Leave(context.Background(), domain.LeaveStallInput{
+		StallID: 2, VendorID: 1, MarketDate: time.Now(),
+	})
+	if !errors.Is(err, domain.ErrNotOwnStall) {
+		t.Fatalf("expected ErrNotOwnStall, got %v", err)
+	}
+}

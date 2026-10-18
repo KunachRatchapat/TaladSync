@@ -33,6 +33,13 @@ func (u *BookingUsecase) BookStall(ctx context.Context, in domain.BookStallInput
 		return err
 	}
 	if cnt > 0 {
+		existing, err := u.repo.FindVendorBookedToday(ctx, in.VendorID, in.MarketDate)
+		if err != nil {
+			return err
+		}
+		if existing != nil && existing.StallID == in.StallID {
+			return nil
+		}
 		return domain.ErrAlreadyHasStall
 	}
 
