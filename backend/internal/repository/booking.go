@@ -125,22 +125,36 @@ func (r *BookingRepository) ListOwnedStallBookings(ctx context.Context, vendorID
 	return bookings, nil
 }
 
-func (r *BookingRepository) TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error) {
+func (r *BookingRepository) LeaveStallWithAudit(ctx context.Context, in domain.LeaveStallInput, log domain.AuditLog) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("stall_id = ? AND market_date = ? AND status = ? AND vendor_id = ?",
-			in.StallID, date, domain.StatusExpected, in.VendorID).
-		Updates(map[string]interface{}{
-			"status":       domain.StatusAvailable,
-			"vendor_id":    nil,
-			"shop_name":    "",
-			"product_type": "",
-		})
-	if res.Error != nil {
-		return 0, res.Error
+	var rows int64
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.
+			Model(&domain.DailyBooking{}).
+			Where("stall_id = ? AND market_date = ? AND status = ? AND vendor_id = ?",
+				in.StallID, date, domain.StatusExpected, in.VendorID).
+			Updates(map[string]interface{}{
+				"status":       domain.StatusAvailable,
+				"vendor_id":    nil,
+				"shop_name":    "",
+				"product_type": "",
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+
+		rows = res.RowsAffected
+		if rows == 0 {
+			return nil
+		}
+
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		return 0, err
 	}
-	return res.RowsAffected, nil
+	return rows, nil
 }
 
 func (r *BookingRepository) FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error) {

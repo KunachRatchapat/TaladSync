@@ -10,7 +10,7 @@ import (
 
 type VendorLeaveRepository interface {
 	GetByStallAndDate(ctx context.Context, stallID uint, date time.Time) (*domain.DailyBooking, error)
-	TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error)
+	LeaveStallWithAudit(ctx context.Context, in domain.LeaveStallInput, log domain.AuditLog) (int64, error)
 	ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error)
 }
 
@@ -20,11 +20,10 @@ type AuditWriter interface {
 
 type VendorUsecase struct {
 	bookings VendorLeaveRepository
-	audit    AuditWriter
 }
 
-func NewVendorUsecase(bookings VendorLeaveRepository, audit AuditWriter) *VendorUsecase {
-	return &VendorUsecase{bookings: bookings, audit: audit}
+func NewVendorUsecase(bookings VendorLeaveRepository) *VendorUsecase {
+	return &VendorUsecase{bookings: bookings}
 }
 
 func (u *VendorUsecase) GetMyStalls(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
@@ -43,23 +42,24 @@ func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) er
 		return domain.ErrLeaveNotAllowed
 	}
 
-	rows, err := u.bookings.TryLeaveStall(ctx, in)
+	detail := fmt.Sprintf("stallId=%d", in.StallID)
+	if booking.Stall != nil {
+		detail = fmt.Sprintf("stall=%s", booking.Stall.Code)
+	}
+	bookingID := booking.ID
+	log := domain.AuditLog{
+		ActorUserID:    in.VendorID,
+		DailyBookingID: &bookingID,
+		Action:         domain.AuditLeave,
+		Detail:         detail,
+	}
+
+	rows, err := u.bookings.LeaveStallWithAudit(ctx, in, log)
 	if err != nil {
 		return err
 	}
 	if rows == 0 {
 		return domain.ErrLeaveNotAllowed
 	}
-
-	detail := fmt.Sprintf("stallId=%d", in.StallID)
-	if booking.Stall != nil {
-		detail = fmt.Sprintf("stall=%s", booking.Stall.Code)
-	}
-	bookingID := booking.ID
-	return u.audit.Create(ctx, domain.AuditLog{
-		ActorUserID:    in.VendorID,
-		DailyBookingID: &bookingID,
-		Action:         domain.AuditLeave,
-		Detail:         detail,
-	})
+	return nil
 }

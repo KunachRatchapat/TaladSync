@@ -59,7 +59,7 @@ func main() {
 	bookingUC := usecase.NewBookingUsecase(bookingRepo)
 	bookingHandler := handler.NewBookingHandler(bookingUC)
 
-	vendorUC := usecase.NewVendorUsecase(bookingRepo, auditRepo)
+	vendorUC := usecase.NewVendorUsecase(bookingRepo)
 	vendorHandler := handler.NewVendorHandler(vendorUC)
 
 	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
