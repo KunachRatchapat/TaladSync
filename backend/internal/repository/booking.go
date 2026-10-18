@@ -185,21 +185,39 @@ func (r *BookingRepository) ListChecklist(ctx context.Context, date time.Time) (
 }
 
 // เช็คว่ามาไหม
-func (r *BookingRepository) SetAttendance(
+func (r *BookingRepository) SetAttendanceWithAudit(
 	ctx context.Context,
 	bookingID, staffID uint,
 	attendance domain.AttendanceStatus,
 	checkedAt time.Time,
+	log domain.AuditLog,
 ) (int64, error) {
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("id = ? AND attendance != ?", bookingID, attendance).
-		Updates(map[string]interface{}{
-			"attendance":          attendance,
-			"checked_by_staff_id": staffID,
-			"checked_at":          checkedAt,
-		})
-	return res.RowsAffected, res.Error
+	var rows int64
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.
+			Model(&domain.DailyBooking{}).
+			Where("id = ? AND attendance != ?", bookingID, attendance).
+			Updates(map[string]interface{}{
+				"attendance":          attendance,
+				"checked_by_staff_id": staffID,
+				"checked_at":          checkedAt,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+
+		rows = res.RowsAffected
+		if rows == 0 {
+			return nil
+		}
+
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
 }
 
 func (r *BookingRepository) SearchDirectory(ctx context.Context, date time.Time, q string) ([]domain.DirectoryEntry, error) {

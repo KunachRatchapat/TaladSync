@@ -12,17 +12,16 @@ import (
 type StaffBookingRepository interface {
 	FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error)
 	ListChecklist(ctx context.Context, date time.Time) ([]domain.DailyBooking, error)
-	SetAttendance(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time) (int64, error)
+	SetAttendanceWithAudit(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time, log domain.AuditLog) (int64, error)
 	AttendanceSummary(ctx context.Context, date time.Time) (domain.AttendanceSummary, error)
 }
 
 type StaffUsecase struct {
 	bookings StaffBookingRepository
-	audit    AuditWriter
 }
 
-func NewStaffUsecase(bookings StaffBookingRepository, audit AuditWriter) *StaffUsecase {
-	return &StaffUsecase{bookings: bookings, audit: audit}
+func NewStaffUsecase(bookings StaffBookingRepository) *StaffUsecase {
+	return &StaffUsecase{bookings: bookings}
 }
 
 func (u *StaffUsecase) GetChecklist(ctx context.Context, date time.Time) ([]domain.DailyBooking, error) {
@@ -53,8 +52,16 @@ func (u *StaffUsecase) MarkAttendance(ctx context.Context, in domain.MarkAttenda
 		return booking, nil
 	}
 
+	bookingID := in.BookingID
+	log := domain.AuditLog{
+		ActorUserID:    in.StaffID,
+		DailyBookingID: &bookingID,
+		Action:         action,
+		Detail:         fmt.Sprintf("attendance=%s", target),
+	}
+
 	checkedAt := timeutil.Now()
-	rows, err := u.bookings.SetAttendance(ctx, in.BookingID, in.StaffID, target, checkedAt)
+	rows, err := u.bookings.SetAttendanceWithAudit(ctx, in.BookingID, in.StaffID, target, checkedAt, log)
 	if err != nil {
 		return nil, err
 	}
@@ -67,17 +74,6 @@ func (u *StaffUsecase) MarkAttendance(ctx context.Context, in domain.MarkAttenda
 			return updated, nil
 		}
 		return nil, domain.ErrInvalidAttendanceTarget
-	}
-
-	bookingID := in.BookingID
-	detail := fmt.Sprintf("attendance=%s", target)
-	if err := u.audit.Create(ctx, domain.AuditLog{
-		ActorUserID:    in.StaffID,
-		DailyBookingID: &bookingID,
-		Action:         action,
-		Detail:         detail,
-	}); err != nil {
-		return nil, err
 	}
 
 	return u.bookings.FindByID(ctx, in.BookingID)

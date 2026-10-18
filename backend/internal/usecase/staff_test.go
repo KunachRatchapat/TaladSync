@@ -10,14 +10,16 @@ import (
 )
 
 type mockStaffRepo struct {
-	booking         *domain.DailyBooking
-	findErr         error
-	setRows         int64
-	setErr          error
-	lastAttendance  domain.AttendanceStatus
-	lastStaffID     uint
-	summary         domain.AttendanceSummary
-	listChecklist   []domain.DailyBooking
+	booking        *domain.DailyBooking
+	findErr        error
+	setRows        int64
+	setErr         error
+	setCalled      bool
+	lastAttendance domain.AttendanceStatus
+	lastStaffID    uint
+	lastAuditLog   domain.AuditLog
+	summary        domain.AttendanceSummary
+	listChecklist  []domain.DailyBooking
 }
 
 func (m *mockStaffRepo) FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error) {
@@ -31,9 +33,11 @@ func (m *mockStaffRepo) ListChecklist(ctx context.Context, date time.Time) ([]do
 	return m.listChecklist, nil
 }
 
-func (m *mockStaffRepo) SetAttendance(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time) (int64, error) {
+func (m *mockStaffRepo) SetAttendanceWithAudit(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time, log domain.AuditLog) (int64, error) {
+	m.setCalled = true
 	m.lastStaffID = staffID
 	m.lastAttendance = attendance
+	m.lastAuditLog = log
 	return m.setRows, m.setErr
 }
 
@@ -48,8 +52,7 @@ func TestMarkAttendance_Present(t *testing.T) {
 		},
 		setRows: 1,
 	}
-	audit := &mockAuditWriter{}
-	uc := NewStaffUsecase(repo, audit)
+	uc := NewStaffUsecase(repo)
 
 	_, err := uc.MarkAttendance(context.Background(), domain.MarkAttendanceInput{
 		BookingID: 5, StaffID: 3, Present: true,
@@ -60,8 +63,14 @@ func TestMarkAttendance_Present(t *testing.T) {
 	if repo.lastAttendance != domain.AttendancePresent {
 		t.Fatalf("expected PRESENT, got %s", repo.lastAttendance)
 	}
-	if len(audit.logs) != 1 || audit.logs[0].Action != domain.AuditCheckin {
-		t.Fatalf("expected CHECKIN audit, got %+v", audit.logs)
+	if repo.lastAuditLog.Action != domain.AuditCheckin {
+		t.Fatalf("expected CHECKIN audit, got %q", repo.lastAuditLog.Action)
+	}
+	if repo.lastAuditLog.ActorUserID != 3 {
+		t.Fatalf("expected actor=3, got %d", repo.lastAuditLog.ActorUserID)
+	}
+	if repo.lastAuditLog.DailyBookingID == nil || *repo.lastAuditLog.DailyBookingID != 5 {
+		t.Fatalf("expected DailyBookingID=5, got %v", repo.lastAuditLog.DailyBookingID)
 	}
 }
 
@@ -72,8 +81,7 @@ func TestMarkAttendance_NoShow(t *testing.T) {
 		},
 		setRows: 1,
 	}
-	audit := &mockAuditWriter{}
-	uc := NewStaffUsecase(repo, audit)
+	uc := NewStaffUsecase(repo)
 
 	_, err := uc.MarkAttendance(context.Background(), domain.MarkAttendanceInput{
 		BookingID: 5, StaffID: 3, Present: false,
@@ -81,8 +89,8 @@ func TestMarkAttendance_NoShow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	if audit.logs[0].Action != domain.AuditNoshow {
-		t.Fatalf("expected NOSHOW audit, got %s", audit.logs[0].Action)
+	if repo.lastAuditLog.Action != domain.AuditNoshow {
+		t.Fatalf("expected NOSHOW audit, got %q", repo.lastAuditLog.Action)
 	}
 }
 
@@ -92,8 +100,7 @@ func TestMarkAttendance_Idempotent(t *testing.T) {
 			ID: 5, Status: domain.StatusBooked, Attendance: domain.AttendancePresent,
 		},
 	}
-	audit := &mockAuditWriter{}
-	uc := NewStaffUsecase(repo, audit)
+	uc := NewStaffUsecase(repo)
 
 	_, err := uc.MarkAttendance(context.Background(), domain.MarkAttendanceInput{
 		BookingID: 5, StaffID: 3, Present: true,
@@ -101,11 +108,8 @@ func TestMarkAttendance_Idempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	if repo.setRows != 0 && repo.lastAttendance != "" {
-		t.Fatal("SetAttendance should not be called when already PRESENT")
-	}
-	if len(audit.logs) != 0 {
-		t.Fatal("expected no audit on idempotent mark")
+	if repo.setCalled {
+		t.Fatal("SetAttendanceWithAudit should not be called when already PRESENT")
 	}
 }
 
@@ -115,7 +119,7 @@ func TestMarkAttendance_InvalidStatus(t *testing.T) {
 			ID: 5, Status: domain.StatusAvailable, Attendance: domain.AttendancePending,
 		},
 	}
-	uc := NewStaffUsecase(repo, &mockAuditWriter{})
+	uc := NewStaffUsecase(repo)
 
 	_, err := uc.MarkAttendance(context.Background(), domain.MarkAttendanceInput{
 		BookingID: 5, StaffID: 3, Present: true,
@@ -127,7 +131,7 @@ func TestMarkAttendance_InvalidStatus(t *testing.T) {
 
 func TestMarkAttendance_NotFound(t *testing.T) {
 	repo := &mockStaffRepo{findErr: domain.ErrBookingNotFound}
-	uc := NewStaffUsecase(repo, &mockAuditWriter{})
+	uc := NewStaffUsecase(repo)
 
 	_, err := uc.MarkAttendance(context.Background(), domain.MarkAttendanceInput{
 		BookingID: 99, StaffID: 3, Present: true,

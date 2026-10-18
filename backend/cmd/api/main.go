@@ -54,7 +54,6 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUC)
 
 	bookingRepo := repository.NewBookingRepository(db)
-	auditRepo := repository.NewAuditRepository(db)
 
 	bookingUC := usecase.NewBookingUsecase(bookingRepo)
 	bookingHandler := handler.NewBookingHandler(bookingUC)
@@ -62,7 +61,7 @@ func main() {
 	vendorUC := usecase.NewVendorUsecase(bookingRepo)
 	vendorHandler := handler.NewVendorHandler(vendorUC)
 
-	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
+	staffUC := usecase.NewStaffUsecase(bookingRepo)
 	staffHandler := handler.NewStaffHandler(staffUC)
 
 	directoryUC := usecase.NewDirectoryUsecase(bookingRepo)

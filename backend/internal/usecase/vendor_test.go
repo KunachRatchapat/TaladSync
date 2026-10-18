@@ -39,19 +39,6 @@ func (m *mockVendorRepo) ListOwnedStallBookings(ctx context.Context, vendorID ui
 	return m.owned, m.ownedErr
 }
 
-type mockAuditWriter struct {
-	logs    []domain.AuditLog
-	createErr error
-}
-
-func (m *mockAuditWriter) Create(ctx context.Context, log domain.AuditLog) error {
-	if m.createErr != nil {
-		return m.createErr
-	}
-	m.logs = append(m.logs, log)
-	return nil
-}
-
 func TestGetMyStalls(t *testing.T) {
 	repo := &mockVendorRepo{
 		owned: []domain.DailyBooking{

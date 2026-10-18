@@ -14,10 +14,6 @@ type VendorLeaveRepository interface {
 	ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error)
 }
 
-type AuditWriter interface {
-	Create(ctx context.Context, log domain.AuditLog) error
-}
-
 type VendorUsecase struct {
 	bookings VendorLeaveRepository
 }
