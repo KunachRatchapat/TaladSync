@@ -10,20 +10,17 @@ import (
 )
 
 type mockBookingRepo struct {
-	listAvailable     []domain.DailyBooking
-	listAvailableErr  error
-	tryRows           int64
-	tryErr            error
-	countToday        int64
-	countTodayErr     error
-	tryBookCalled     bool
-	countTodayCalled  bool
-	lastTryBookInput  domain.BookStallInput
-	lastCountVendorID uint
-	lastCountDate     time.Time
-	findBooking       *domain.DailyBooking
-	findBookingErr    error
-	lastAuditLog      domain.AuditLog
+	listAvailable    []domain.DailyBooking
+	listAvailableErr error
+	tryRows          int64
+	tryErr           error
+	tryBookCalled    bool
+	lastTryBookInput domain.BookStallInput
+	findBooking      *domain.DailyBooking
+	findBookingErr   error
+	findCalled       bool
+	lastFindVendorID uint
+	lastAuditLog     domain.AuditLog
 }
 
 func (m *mockBookingRepo) ListAvailable(ctx context.Context, date time.Time) ([]domain.DailyBooking, error) {
@@ -37,19 +34,14 @@ func (m *mockBookingRepo) BookStallWithAudit(ctx context.Context, in domain.Book
 	return m.tryRows, m.tryErr
 }
 
-func (m *mockBookingRepo) CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error) {
-	m.countTodayCalled = true
-	m.lastCountVendorID = vendorID
-	m.lastCountDate = date
-	return m.countToday, m.countTodayErr
-}
-
 func (m *mockBookingRepo) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
+	m.findCalled = true
+	m.lastFindVendorID = vendorID
 	return m.findBooking, m.findBookingErr
 }
 
 func TestBookStall_Success(t *testing.T) {
-	repo := &mockBookingRepo{countToday: 0, tryRows: 1}
+	repo := &mockBookingRepo{tryRows: 1}
 	uc := NewBookingUsecase(repo)
 
 	in := domain.BookStallInput{
@@ -61,8 +53,11 @@ func TestBookStall_Success(t *testing.T) {
 	if err := uc.BookStall(context.Background(), in); err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	if !repo.countTodayCalled || !repo.tryBookCalled {
-		t.Fatal("expected CountVendorBookingToday and BookStallWithAudit to be called")
+	if !repo.findCalled || !repo.tryBookCalled {
+		t.Fatal("expected FindVendorBookedToday and BookStallWithAudit to be called")
+	}
+	if repo.lastFindVendorID != 2 {
+		t.Fatalf("expected FindVendorBookedToday for vendor 2, got %d", repo.lastFindVendorID)
 	}
 	if repo.lastTryBookInput.StallID != 13 || repo.lastTryBookInput.VendorID != 2 {
 		t.Fatalf("unexpected BookStallWithAudit input: %+v", repo.lastTryBookInput)
@@ -77,7 +72,6 @@ func TestBookStall_Success(t *testing.T) {
 
 func TestBookStall_RetrySameStall(t *testing.T) {
 	repo := &mockBookingRepo{
-		countToday:  1,
 		findBooking: &domain.DailyBooking{StallID: 13, Status: domain.StatusBooked},
 	}
 	uc := NewBookingUsecase(repo)
@@ -95,7 +89,6 @@ func TestBookStall_RetrySameStall(t *testing.T) {
 
 func TestBookStall_AlreadyHasStall(t *testing.T) {
 	repo := &mockBookingRepo{
-		countToday:  1,
 		findBooking: &domain.DailyBooking{StallID: 14, Status: domain.StatusBooked},
 	}
 	uc := NewBookingUsecase(repo)
@@ -112,7 +105,7 @@ func TestBookStall_AlreadyHasStall(t *testing.T) {
 }
 
 func TestBookStall_StallNotAvailable(t *testing.T) {
-	repo := &mockBookingRepo{countToday: 0, tryRows: 0}
+	repo := &mockBookingRepo{tryRows: 0}
 	uc := NewBookingUsecase(repo)
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{
@@ -127,7 +120,7 @@ func TestBookStall_StallNotAvailable(t *testing.T) {
 }
 
 func TestBookStall_AlreadyHasStall_UniqueViolation(t *testing.T) {
-	repo := &mockBookingRepo{countToday: 0, tryErr: domain.ErrAlreadyHasStall}
+	repo := &mockBookingRepo{tryErr: domain.ErrAlreadyHasStall}
 	uc := NewBookingUsecase(repo)
 
 	err := uc.BookStall(context.Background(), domain.BookStallInput{
@@ -138,5 +131,21 @@ func TestBookStall_AlreadyHasStall_UniqueViolation(t *testing.T) {
 	}
 	if !repo.tryBookCalled {
 		t.Fatal("expected BookStallWithAudit to be called")
+	}
+}
+
+func TestBookStall_FindError(t *testing.T) {
+	dbErr := errors.New("db down")
+	repo := &mockBookingRepo{findBookingErr: dbErr}
+	uc := NewBookingUsecase(repo)
+
+	err := uc.BookStall(context.Background(), domain.BookStallInput{
+		StallID: 13, VendorID: 2, MarketDate: time.Now(),
+	})
+	if !errors.Is(err, dbErr) {
+		t.Fatalf("expected db error, got %v", err)
+	}
+	if repo.tryBookCalled {
+		t.Fatal("BookStallWithAudit should not be called when the lookup fails")
 	}
 }

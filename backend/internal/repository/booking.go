@@ -64,19 +64,6 @@ func (r *BookingRepository) BookStallWithAudit(ctx context.Context, in domain.Bo
 	return int64(len(bookedIDs)), nil
 }
 
-//Check ว่าจองไปกี่แผงแล้วนะ
-func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error) {
-	date = timeutil.MarketDate(date)
-	var count int64
-	err := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("vendor_id = ? AND market_date = ? AND status = ?",
-			vendorID, date, domain.StatusBooked).
-		Count(&count).Error
-	return count, err
-}
-
-
 func (r *BookingRepository) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
 	date = timeutil.MarketDate(date)
 	var booking domain.DailyBooking

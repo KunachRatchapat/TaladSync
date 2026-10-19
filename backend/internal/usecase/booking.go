@@ -11,7 +11,6 @@ import (
 type BookingRepository interface {
 	ListAvailable(ctx context.Context, date time.Time) ([]domain.DailyBooking, error)
 	BookStallWithAudit(ctx context.Context, in domain.BookStallInput, log domain.AuditLog) (int64, error)
-	CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error)
 	FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error)
 }
 
@@ -28,16 +27,12 @@ func (u *BookingUsecase) ListAvailable(ctx context.Context, date time.Time) ([]d
 }
 
 func (u *BookingUsecase) BookStall(ctx context.Context, in domain.BookStallInput) error {
-	cnt, err := u.repo.CountVendorBookingToday(ctx, in.VendorID, in.MarketDate)
+	existing, err := u.repo.FindVendorBookedToday(ctx, in.VendorID, in.MarketDate)
 	if err != nil {
 		return err
 	}
-	if cnt > 0 {
-		existing, err := u.repo.FindVendorBookedToday(ctx, in.VendorID, in.MarketDate)
-		if err != nil {
-			return err
-		}
-		if existing != nil && existing.StallID == in.StallID {
+	if existing != nil {
+		if existing.StallID == in.StallID {
 			return nil
 		}
 		return domain.ErrAlreadyHasStall
