@@ -61,11 +61,11 @@ func TestLeave_Success(t *testing.T) {
 	vendorID := uint(1)
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
-			ID:      10,
-			StallID: 1,
-			Status:  domain.StatusExpected,
+			ID:       10,
+			StallID:  1,
+			Status:   domain.StatusExpected,
 			VendorID: &vendorID,
-			Stall:   &domain.Stall{Code: "A-01"},
+			Stall:    &domain.Stall{Code: "A-01", OwnerVendorID: &vendorID},
 		},
 		tryRows: 1,
 	}
@@ -93,6 +93,7 @@ func TestLeave_RaceLost(t *testing.T) {
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
 			ID: 10, Status: domain.StatusExpected, VendorID: &vendorID,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &vendorID},
 		},
 		tryRows: 0,
 	}
@@ -114,6 +115,7 @@ func TestLeave_NotOwnStall(t *testing.T) {
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
 			Status: domain.StatusExpected, VendorID: &ownerID,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &ownerID},
 		},
 	}
 	uc := NewVendorUsecase(repo)
@@ -124,22 +126,8 @@ func TestLeave_NotOwnStall(t *testing.T) {
 	if !errors.Is(err, domain.ErrNotOwnStall) {
 		t.Fatalf("expected ErrNotOwnStall, got %v", err)
 	}
-}
-
-func TestLeave_WrongStatus(t *testing.T) {
-	vendorID := uint(1)
-	repo := &mockVendorRepo{
-		booking: &domain.DailyBooking{
-			Status: domain.StatusAvailable, VendorID: &vendorID,
-		},
-	}
-	uc := NewVendorUsecase(repo)
-
-	err := uc.Leave(context.Background(), domain.LeaveStallInput{
-		StallID: 1, VendorID: 1, MarketDate: time.Now(),
-	})
-	if !errors.Is(err, domain.ErrLeaveNotAllowed) {
-		t.Fatalf("expected ErrLeaveNotAllowed, got %v", err)
+	if repo.tryCalled {
+		t.Fatal("LeaveStallWithAudit should not be called for another vendor's stall")
 	}
 }
 

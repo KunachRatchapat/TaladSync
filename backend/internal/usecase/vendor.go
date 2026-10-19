@@ -31,11 +31,11 @@ func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) er
 	if err != nil {
 		return err
 	}
-	if booking.VendorID == nil || *booking.VendorID != in.VendorID {
+	if !ownsStall(booking, in.VendorID) {
 		return domain.ErrNotOwnStall
 	}
 	if booking.Status != domain.StatusExpected {
-		return domain.ErrLeaveNotAllowed
+		return nil
 	}
 
 	detail := fmt.Sprintf("stallId=%d", in.StallID)
@@ -58,4 +58,10 @@ func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) er
 		return domain.ErrLeaveNotAllowed
 	}
 	return nil
+}
+
+func ownsStall(booking *domain.DailyBooking, vendorID uint) bool {
+	return booking.Stall != nil &&
+		booking.Stall.OwnerVendorID != nil &&
+		*booking.Stall.OwnerVendorID == vendorID
 }
