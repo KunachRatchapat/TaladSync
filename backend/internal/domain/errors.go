@@ -37,6 +37,13 @@ type MarkAttendanceInput struct {
 	Present   bool
 }
 
+type SetAttendanceInput struct {
+	BookingID  uint
+	StaffID    uint
+	Attendance AttendanceStatus
+	CheckedAt  time.Time
+}
+
 type AttendanceSummary struct {
 	Present int64
 	NoShow  int64

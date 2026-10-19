@@ -12,7 +12,7 @@ import (
 type StaffBookingRepository interface {
 	FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error)
 	ListChecklist(ctx context.Context, date time.Time) ([]domain.DailyBooking, error)
-	SetAttendanceWithAudit(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time, log domain.AuditLog) (int64, error)
+	SetAttendanceWithAudit(ctx context.Context, in domain.SetAttendanceInput, log domain.AuditLog) (int64, error)
 	AttendanceSummary(ctx context.Context, date time.Time) (domain.AttendanceSummary, error)
 }
 
@@ -60,8 +60,12 @@ func (u *StaffUsecase) MarkAttendance(ctx context.Context, in domain.MarkAttenda
 		Detail:         fmt.Sprintf("attendance=%s", target),
 	}
 
-	checkedAt := timeutil.Now()
-	rows, err := u.bookings.SetAttendanceWithAudit(ctx, in.BookingID, in.StaffID, target, checkedAt, log)
+	rows, err := u.bookings.SetAttendanceWithAudit(ctx, domain.SetAttendanceInput{
+		BookingID:  in.BookingID,
+		StaffID:    in.StaffID,
+		Attendance: target,
+		CheckedAt:  timeutil.Now(),
+	}, log)
 	if err != nil {
 		return nil, err
 	}

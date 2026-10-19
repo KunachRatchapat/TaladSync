@@ -33,10 +33,10 @@ func (m *mockStaffRepo) ListChecklist(ctx context.Context, date time.Time) ([]do
 	return m.listChecklist, nil
 }
 
-func (m *mockStaffRepo) SetAttendanceWithAudit(ctx context.Context, bookingID, staffID uint, attendance domain.AttendanceStatus, checkedAt time.Time, log domain.AuditLog) (int64, error) {
+func (m *mockStaffRepo) SetAttendanceWithAudit(ctx context.Context, in domain.SetAttendanceInput, log domain.AuditLog) (int64, error) {
 	m.setCalled = true
-	m.lastStaffID = staffID
-	m.lastAttendance = attendance
+	m.lastStaffID = in.StaffID
+	m.lastAttendance = in.Attendance
 	m.lastAuditLog = log
 	return m.setRows, m.setErr
 }

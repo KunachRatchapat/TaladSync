@@ -172,23 +172,17 @@ func (r *BookingRepository) ListChecklist(ctx context.Context, date time.Time) (
 }
 
 // เช็คว่ามาไหม
-func (r *BookingRepository) SetAttendanceWithAudit(
-	ctx context.Context,
-	bookingID, staffID uint,
-	attendance domain.AttendanceStatus,
-	checkedAt time.Time,
-	log domain.AuditLog,
-) (int64, error) {
+func (r *BookingRepository) SetAttendanceWithAudit(ctx context.Context, in domain.SetAttendanceInput, log domain.AuditLog) (int64, error) {
 	var rows int64
 
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		res := tx.
 			Model(&domain.DailyBooking{}).
-			Where("id = ? AND attendance != ?", bookingID, attendance).
+			Where("id = ? AND attendance != ?", in.BookingID, in.Attendance).
 			Updates(map[string]interface{}{
-				"attendance":          attendance,
-				"checked_by_staff_id": staffID,
-				"checked_at":          checkedAt,
+				"attendance":          in.Attendance,
+				"checked_by_staff_id": in.StaffID,
+				"checked_at":          in.CheckedAt,
 			})
 		if res.Error != nil {
 			return res.Error
