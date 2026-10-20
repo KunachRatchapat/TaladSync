@@ -67,6 +67,10 @@ func main() {
 	directoryUC := usecase.NewDirectoryUsecase(bookingRepo)
 	directoryHandler := handler.NewDirectoryHandler(directoryUC)
 
+	stallRepo := repository.NewStallRepository(db)
+	stallUC := usecase.NewStallUsecase(stallRepo)
+	stallHandler := handler.NewStallHandler(stallUC)
+
 	app := fiber.New()
 	app.Use(recover.New())
 	app.Use(logger.New())
@@ -91,6 +95,8 @@ func main() {
 
 	protected := api.Group("/auth", authMW)
 	protected.Get("/me", authHandler.Me)
+
+	api.Get("/zones", authMW, stallHandler.ListZones)
 
 	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
 	api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.GetMine)
