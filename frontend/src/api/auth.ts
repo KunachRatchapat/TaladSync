@@ -6,6 +6,11 @@ interface MockLoginResponse {
   user: User
 }
 
+export async function fetchMe(): Promise<User> {
+  const data = await apiFetch<{ user: User }>('/api/auth/me', { auth: true })
+  return data.user
+}
+
 export async function mockLogin(role: Role): Promise<MockLoginResponse> {
   return apiFetch<MockLoginResponse>('/api/auth/mock-login', {
     method: 'POST',

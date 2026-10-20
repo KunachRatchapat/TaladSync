@@ -55,7 +55,7 @@ func SeedIfEmpty(db *gorm.DB) error {
 		}
 		walkin := domain.User{
 			NationalID: "1100700009002",
-			Name:       "ขาจรทดสอบ",
+			Name:       "ป้าแดง ขายผัก",
 			Phone:      "0810000002",
 			Role:       domain.RoleWalkin,
 		}

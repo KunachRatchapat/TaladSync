@@ -15,6 +15,8 @@ type mockVendorRepo struct {
 	tryRows       int64
 	tryErr        error
 	tryLeaveInput domain.LeaveStallInput
+	tryCalled     bool
+	lastAuditLog  domain.AuditLog
 	owned         []domain.DailyBooking
 	ownedErr      error
 }
@@ -26,26 +28,15 @@ func (m *mockVendorRepo) GetByStallAndDate(ctx context.Context, stallID uint, da
 	return m.booking, nil
 }
 
-func (m *mockVendorRepo) TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error) {
+func (m *mockVendorRepo) LeaveStallWithAudit(ctx context.Context, in domain.LeaveStallInput, log domain.AuditLog) (int64, error) {
+	m.tryCalled = true
 	m.tryLeaveInput = in
+	m.lastAuditLog = log
 	return m.tryRows, m.tryErr
 }
 
 func (m *mockVendorRepo) ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
 	return m.owned, m.ownedErr
-}
-
-type mockAuditWriter struct {
-	logs    []domain.AuditLog
-	createErr error
-}
-
-func (m *mockAuditWriter) Create(ctx context.Context, log domain.AuditLog) error {
-	if m.createErr != nil {
-		return m.createErr
-	}
-	m.logs = append(m.logs, log)
-	return nil
 }
 
 func TestGetMyStalls(t *testing.T) {
@@ -55,7 +46,7 @@ func TestGetMyStalls(t *testing.T) {
 			{StallID: 2, Status: domain.StatusAvailable, Stall: &domain.Stall{Code: "A-02"}},
 		},
 	}
-	uc := NewVendorUsecase(repo, &mockAuditWriter{})
+	uc := NewVendorUsecase(repo)
 
 	stalls, err := uc.GetMyStalls(context.Background(), 1, time.Now())
 	if err != nil {
@@ -70,16 +61,15 @@ func TestLeave_Success(t *testing.T) {
 	vendorID := uint(1)
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
-			ID:      10,
-			StallID: 1,
-			Status:  domain.StatusExpected,
+			ID:       10,
+			StallID:  1,
+			Status:   domain.StatusExpected,
 			VendorID: &vendorID,
-			Stall:   &domain.Stall{Code: "A-01"},
+			Stall:    &domain.Stall{Code: "A-01", OwnerVendorID: &vendorID},
 		},
 		tryRows: 1,
 	}
-	audit := &mockAuditWriter{}
-	uc := NewVendorUsecase(repo, audit)
+	uc := NewVendorUsecase(repo)
 
 	err := uc.Leave(context.Background(), domain.LeaveStallInput{
 		StallID: 1, VendorID: 1, MarketDate: time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC),
@@ -87,8 +77,36 @@ func TestLeave_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil, got %v", err)
 	}
-	if len(audit.logs) != 1 || audit.logs[0].Action != domain.AuditLeave {
-		t.Fatalf("expected LEAVE audit, got %+v", audit.logs)
+	if repo.lastAuditLog.Action != domain.AuditLeave {
+		t.Fatalf("expected LEAVE audit, got %q", repo.lastAuditLog.Action)
+	}
+	if repo.lastAuditLog.DailyBookingID == nil || *repo.lastAuditLog.DailyBookingID != 10 {
+		t.Fatalf("expected DailyBookingID=10, got %v", repo.lastAuditLog.DailyBookingID)
+	}
+	if repo.lastAuditLog.Detail != "stall=A-01" {
+		t.Fatalf("expected detail stall=A-01, got %q", repo.lastAuditLog.Detail)
+	}
+}
+
+func TestLeave_RaceLost(t *testing.T) {
+	vendorID := uint(1)
+	repo := &mockVendorRepo{
+		booking: &domain.DailyBooking{
+			ID: 10, Status: domain.StatusExpected, VendorID: &vendorID,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &vendorID},
+		},
+		tryRows: 0,
+	}
+	uc := NewVendorUsecase(repo)
+
+	err := uc.Leave(context.Background(), domain.LeaveStallInput{
+		StallID: 1, VendorID: 1, MarketDate: time.Now(),
+	})
+	if !errors.Is(err, domain.ErrLeaveNotAllowed) {
+		t.Fatalf("expected ErrLeaveNotAllowed, got %v", err)
+	}
+	if !repo.tryCalled {
+		t.Fatal("expected LeaveStallWithAudit to be called")
 	}
 }
 
@@ -97,9 +115,10 @@ func TestLeave_NotOwnStall(t *testing.T) {
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
 			Status: domain.StatusExpected, VendorID: &ownerID,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &ownerID},
 		},
 	}
-	uc := NewVendorUsecase(repo, &mockAuditWriter{})
+	uc := NewVendorUsecase(repo)
 
 	err := uc.Leave(context.Background(), domain.LeaveStallInput{
 		StallID: 1, VendorID: 99, MarketDate: time.Now(),
@@ -107,21 +126,46 @@ func TestLeave_NotOwnStall(t *testing.T) {
 	if !errors.Is(err, domain.ErrNotOwnStall) {
 		t.Fatalf("expected ErrNotOwnStall, got %v", err)
 	}
+	if repo.tryCalled {
+		t.Fatal("LeaveStallWithAudit should not be called for another vendor's stall")
+	}
 }
 
-func TestLeave_WrongStatus(t *testing.T) {
-	vendorID := uint(1)
+func TestLeave_RetryAfterLeft(t *testing.T) {
+	ownerID := uint(1)
 	repo := &mockVendorRepo{
 		booking: &domain.DailyBooking{
-			Status: domain.StatusAvailable, VendorID: &vendorID,
+			ID: 10, StallID: 1, Status: domain.StatusAvailable,
+			Stall: &domain.Stall{Code: "A-01", OwnerVendorID: &ownerID},
 		},
 	}
-	uc := NewVendorUsecase(repo, &mockAuditWriter{})
+	uc := NewVendorUsecase(repo)
 
 	err := uc.Leave(context.Background(), domain.LeaveStallInput{
 		StallID: 1, VendorID: 1, MarketDate: time.Now(),
 	})
-	if !errors.Is(err, domain.ErrLeaveNotAllowed) {
-		t.Fatalf("expected ErrLeaveNotAllowed, got %v", err)
+	if err != nil {
+		t.Fatalf("expected nil on retry after leaving, got %v", err)
+	}
+	if repo.tryCalled {
+		t.Fatal("LeaveStallWithAudit should not be called on retry")
+	}
+}
+
+func TestLeave_OtherOwnerAlreadyLeft(t *testing.T) {
+	ownerID := uint(2)
+	repo := &mockVendorRepo{
+		booking: &domain.DailyBooking{
+			ID: 11, StallID: 2, Status: domain.StatusAvailable,
+			Stall: &domain.Stall{Code: "A-02", OwnerVendorID: &ownerID},
+		},
+	}
+	uc := NewVendorUsecase(repo)
+
+	err := uc.Leave(context.Background(), domain.LeaveStallInput{
+		StallID: 2, VendorID: 1, MarketDate: time.Now(),
+	})
+	if !errors.Is(err, domain.ErrNotOwnStall) {
+		t.Fatalf("expected ErrNotOwnStall, got %v", err)
 	}
 }

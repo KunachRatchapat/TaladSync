@@ -109,6 +109,7 @@ function onClose() {
             <span class="text-sm font-medium text-gray-700">ชื่อร้าน</span>
             <input
               v-model="shopName"
+              maxlength="100"
               type="text"
               placeholder="เช่น ร้านป้าสมทรง"
               class="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
@@ -119,6 +120,7 @@ function onClose() {
             <span class="text-sm font-medium text-gray-700">ประเภทสินค้า</span>
             <input
               v-model="productType"
+              maxlength="100"
               type="text"
               placeholder="เช่น ผลไม้ / ของสด / เสื้อผ้า"
               class="w-full rounded-xl border border-gray-300 px-4 py-3 text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"

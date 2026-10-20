@@ -46,7 +46,7 @@ func (s *tokenService) Sign(userID uint, role domain.Role) (string, error) {
 	return token.SignedString(s.secret)
 }
 
-//ถอดรหัสจาก token
+
 func (s *tokenService) Parse(tokenStr string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {

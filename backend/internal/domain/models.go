@@ -35,14 +35,18 @@ const (
 )
 
 type User struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	NationalID string    `gorm:"uniqueIndex;size:13" json:"-"`
-	LineUserID *string   `gorm:"uniqueIndex;size:64" json:"lineUserId,omitempty"`
-	Name       string    `gorm:"size:100" json:"name"`
-	Phone      string    `gorm:"size:20;index" json:"phone"`
-	Role       Role      `gorm:"size:20;index" json:"role"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	NationalID  string    `gorm:"uniqueIndex;size:13" json:"-"`
+	LineUserID  *string   `gorm:"uniqueIndex;size:64" json:"lineUserId,omitempty"`
+	Name        string    `gorm:"size:100" json:"name"`
+	Phone       string    `gorm:"size:20;index" json:"phone"`
+	Role        Role      `gorm:"size:20;index" json:"role"`
+	ShopName    string    `gorm:"size:100" json:"shopName"`
+	Zone        string    `gorm:"size:50" json:"zone"`
+	ProductType string    `gorm:"size:50" json:"productType"`
+	LineID      string    `gorm:"size:50" json:"lineId"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Stall struct {

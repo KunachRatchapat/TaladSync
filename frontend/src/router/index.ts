@@ -3,6 +3,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import DirectoryView from '@/views/DirectoryView.vue'
 import RegularView from '@/views/RegularView.vue'
 import StaffView from '@/views/StaffView.vue'
+import WalkinHomeView from '@/views/WalkinHomeView.vue'
+import WalkinShopView from '@/views/WalkinShopView.vue'
 import WalkinView from '@/views/WalkinView.vue'
 
 const router = createRouter({
@@ -11,7 +13,17 @@ const router = createRouter({
     {
       path: '/',
       name: 'walkin',
+      component: WalkinHomeView,
+    },
+    {
+      path: '/walkin/book',
+      name: 'walkin-book',
       component: WalkinView,
+    },
+    {
+      path: '/walkin/shop',
+      name: 'walkin-shop',
+      component: WalkinShopView,
     },
     {
       path: '/staff',

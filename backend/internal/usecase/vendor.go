@@ -10,21 +10,16 @@ import (
 
 type VendorLeaveRepository interface {
 	GetByStallAndDate(ctx context.Context, stallID uint, date time.Time) (*domain.DailyBooking, error)
-	TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error)
+	LeaveStallWithAudit(ctx context.Context, in domain.LeaveStallInput, log domain.AuditLog) (int64, error)
 	ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error)
-}
-
-type AuditWriter interface {
-	Create(ctx context.Context, log domain.AuditLog) error
 }
 
 type VendorUsecase struct {
 	bookings VendorLeaveRepository
-	audit    AuditWriter
 }
 
-func NewVendorUsecase(bookings VendorLeaveRepository, audit AuditWriter) *VendorUsecase {
-	return &VendorUsecase{bookings: bookings, audit: audit}
+func NewVendorUsecase(bookings VendorLeaveRepository) *VendorUsecase {
+	return &VendorUsecase{bookings: bookings}
 }
 
 func (u *VendorUsecase) GetMyStalls(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
@@ -36,19 +31,11 @@ func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) er
 	if err != nil {
 		return err
 	}
-	if booking.VendorID == nil || *booking.VendorID != in.VendorID {
+	if !ownsStall(booking, in.VendorID) {
 		return domain.ErrNotOwnStall
 	}
 	if booking.Status != domain.StatusExpected {
-		return domain.ErrLeaveNotAllowed
-	}
-
-	rows, err := u.bookings.TryLeaveStall(ctx, in)
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return domain.ErrLeaveNotAllowed
+		return nil
 	}
 
 	detail := fmt.Sprintf("stallId=%d", in.StallID)
@@ -56,10 +43,25 @@ func (u *VendorUsecase) Leave(ctx context.Context, in domain.LeaveStallInput) er
 		detail = fmt.Sprintf("stall=%s", booking.Stall.Code)
 	}
 	bookingID := booking.ID
-	return u.audit.Create(ctx, domain.AuditLog{
+	log := domain.AuditLog{
 		ActorUserID:    in.VendorID,
 		DailyBookingID: &bookingID,
 		Action:         domain.AuditLeave,
 		Detail:         detail,
-	})
+	}
+
+	rows, err := u.bookings.LeaveStallWithAudit(ctx, in, log)
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return domain.ErrLeaveNotAllowed
+	}
+	return nil
+}
+
+func ownsStall(booking *domain.DailyBooking, vendorID uint) bool {
+	return booking.Stall != nil &&
+		booking.Stall.OwnerVendorID != nil &&
+		*booking.Stall.OwnerVendorID == vendorID
 }

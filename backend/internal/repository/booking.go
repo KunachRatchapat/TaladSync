@@ -25,45 +25,43 @@ func (r *BookingRepository) ListAvailable(ctx context.Context, date time.Time) (
 	var bookings []domain.DailyBooking
 	err := r.db.WithContext(ctx).
 		Preload("Stall").
-		Where("market_date = ? AND status = ?", date, domain.StatusAvailable).
-		Find(&bookings).Error
+		Where("market_date = ? AND status = ?", date, domain.StatusAvailable).Find(&bookings).Error
 	if err != nil {
 		return nil, err
 	}
 	return bookings, nil
 }
 
-func (r *BookingRepository) TryBookStall(ctx context.Context, in domain.BookStallInput) (int64, error) {
+func (r *BookingRepository) BookStallWithAudit(ctx context.Context, in domain.BookStallInput, log domain.AuditLog) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("stall_id = ? AND market_date = ? AND status = ?",
-			in.StallID, date, domain.StatusAvailable).
-		Updates(map[string]interface{}{
-			"status":       domain.StatusBooked,
-			"vendor_id":    in.VendorID,
-			"shop_name":    in.ShopName,
-			"product_type": in.ProductType,
-			"booked_at":    timeutil.Now(),
-		})
-	if res.Error != nil {
-		if isDuplicateKey(res.Error) {
+	var bookedIDs []uint
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.Raw(`
+	UPDATE daily_bookings
+	SET status = ?, vendor_id = ?, shop_name = ?, product_type = ?, booked_at = ?
+	WHERE stall_id = ? AND market_date = ? AND status = ?
+	RETURNING id
+	`, domain.StatusBooked, in.VendorID, in.ShopName, in.ProductType, timeutil.Now(), in.StallID, date, domain.StatusAvailable,
+		).Scan(&bookedIDs).Error
+		if err != nil {
+			return err
+		}
+
+		if len(bookedIDs) == 0 {
+			return nil
+		}
+
+		log.DailyBookingID = &bookedIDs[0]
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		if isDuplicateKey(err) {
 			return 0, domain.ErrAlreadyHasStall
 		}
-		return 0, res.Error
+		return 0, err
 	}
-	return res.RowsAffected, nil
-}
-
-func (r *BookingRepository) CountVendorBookingToday(ctx context.Context, vendorID uint, date time.Time) (int64, error) {
-	date = timeutil.MarketDate(date)
-	var count int64
-	err := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("vendor_id = ? AND market_date = ? AND status = ?",
-			vendorID, date, domain.StatusBooked).
-		Count(&count).Error
-	return count, err
+	return int64(len(bookedIDs)), nil
 }
 
 func (r *BookingRepository) FindVendorBookedToday(ctx context.Context, vendorID uint, date time.Time) (*domain.DailyBooking, error) {
@@ -99,7 +97,6 @@ func (r *BookingRepository) GetByStallAndDate(ctx context.Context, stallID uint,
 	return &booking, nil
 }
 
-
 func (r *BookingRepository) ListOwnedStallBookings(ctx context.Context, vendorID uint, date time.Time) ([]domain.DailyBooking, error) {
 	date = timeutil.MarketDate(date)
 	var bookings []domain.DailyBooking
@@ -115,24 +112,37 @@ func (r *BookingRepository) ListOwnedStallBookings(ctx context.Context, vendorID
 	return bookings, nil
 }
 
-func (r *BookingRepository) TryLeaveStall(ctx context.Context, in domain.LeaveStallInput) (int64, error) {
+func (r *BookingRepository) LeaveStallWithAudit(ctx context.Context, in domain.LeaveStallInput, log domain.AuditLog) (int64, error) {
 	date := timeutil.MarketDate(in.MarketDate)
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("stall_id = ? AND market_date = ? AND status = ? AND vendor_id = ?",
-			in.StallID, date, domain.StatusExpected, in.VendorID).
-		Updates(map[string]interface{}{
-			"status":       domain.StatusAvailable,
-			"vendor_id":    nil,
-			"shop_name":    "",
-			"product_type": "",
-		})
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return res.RowsAffected, nil
-}
+	var rows int64
 
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.
+			Model(&domain.DailyBooking{}).
+			Where("stall_id = ? AND market_date = ? AND status = ? AND vendor_id = ?",
+				in.StallID, date, domain.StatusExpected, in.VendorID).
+			Updates(map[string]interface{}{
+				"status":       domain.StatusAvailable,
+				"vendor_id":    nil,
+				"shop_name":    "",
+				"product_type": "",
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+
+		rows = res.RowsAffected
+		if rows == 0 {
+			return nil
+		}
+
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
+}
 
 func (r *BookingRepository) FindByID(ctx context.Context, id uint) (*domain.DailyBooking, error) {
 	var booking domain.DailyBooking
@@ -161,22 +171,34 @@ func (r *BookingRepository) ListChecklist(ctx context.Context, date time.Time) (
 	return bookings, nil
 }
 
-//เช็คว่ามาไหม
-func (r *BookingRepository) SetAttendance(
-	ctx context.Context,
-	bookingID, staffID uint,
-	attendance domain.AttendanceStatus,
-	checkedAt time.Time,
-) (int64, error) {
-	res := r.db.WithContext(ctx).
-		Model(&domain.DailyBooking{}).
-		Where("id = ? AND attendance != ?", bookingID, attendance).
-		Updates(map[string]interface{}{
-			"attendance":           attendance,
-			"checked_by_staff_id": staffID,
-			"checked_at":           checkedAt,
-		})
-	return res.RowsAffected, res.Error
+// เช็คว่ามาไหม
+func (r *BookingRepository) SetAttendanceWithAudit(ctx context.Context, in domain.SetAttendanceInput, log domain.AuditLog) (int64, error) {
+	var rows int64
+
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.
+			Model(&domain.DailyBooking{}).
+			Where("id = ? AND attendance != ?", in.BookingID, in.Attendance).
+			Updates(map[string]interface{}{
+				"attendance":          in.Attendance,
+				"checked_by_staff_id": in.StaffID,
+				"checked_at":          in.CheckedAt,
+			})
+		if res.Error != nil {
+			return res.Error
+		}
+
+		rows = res.RowsAffected
+		if rows == 0 {
+			return nil
+		}
+
+		return tx.Create(&log).Error
+	})
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
 }
 
 func (r *BookingRepository) SearchDirectory(ctx context.Context, date time.Time, q string) ([]domain.DirectoryEntry, error) {

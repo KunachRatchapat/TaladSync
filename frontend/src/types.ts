@@ -37,6 +37,15 @@ export interface BookingForm {
   date: string
 }
 
+export interface ShopProfileForm {
+  shopName: string
+  zone: string
+  productType: string
+  ownerName: string
+  phone: string
+  lineId: string
+}
+
 // --- STAFF roll-call (F2) ---
 
 export type AttendanceStatus = 'PENDING' | 'PRESENT' | 'NOSHOW'

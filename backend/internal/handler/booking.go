@@ -44,8 +44,16 @@ func (h *BookingHandler) Book(c *fiber.Ctx) error {
 	}
 
 	var req bookRequest
-	if err := c.BodyParser(&req); err != nil ||
-		req.StallID == 0 || req.ShopName == "" || req.ProductType == "" {
+	if err := c.BodyParser(&req); err != nil || req.StallID == 0 {
+		return badRequest(c)
+	}
+
+	shopName, ok := cleanText(req.ShopName, maxTextLen)
+	if !ok {
+		return badRequest(c)
+	}
+	productType, ok := cleanText(req.ProductType, maxTextLen)
+	if !ok {
 		return badRequest(c)
 	}
 
@@ -58,8 +66,8 @@ func (h *BookingHandler) Book(c *fiber.Ctx) error {
 		StallID:     req.StallID,
 		VendorID:    claims.UserID,
 		MarketDate:  marketDate,
-		ShopName:    req.ShopName,
-		ProductType: req.ProductType,
+		ShopName:    shopName,
+		ProductType: productType,
 	})
 	if err != nil {
 		return RespondError(c, err)

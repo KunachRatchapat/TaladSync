@@ -32,6 +32,33 @@
 | `components/StallCard.vue` | list row → **การ์ดกริด** 3 สถานะ (ว่าง / selected / disabled) |
 | `database/seed.go` | **โซน A (A-01..A-15 มีเจ้าของ) + โซน B (B-01..B-15 ว่าง)** แทน Zone A + Pool เดิม |
 
+**หน้าแรกขาจร (ดีไซน์ใหม่ ยังไม่ commit):**
+
+| ไฟล์ | ทำอะไร |
+|------|--------|
+| `views/WalkinHomeView.vue` 🆕 | `/` = หน้าแรก: วันที่ + การ์ดสถานะ + เมนู 6 ช่อง (กริด 3 คอลัมน์) |
+| `components/WalkinStatusCard.vue` 🆕 | การ์ดเขียว: สถานะ (ไม่มีแผง/จองแล้ว) · ชื่อร้าน · เหลือล็อคว่าง N หรือรหัสแผงที่จอง |
+| `components/MenuTile.vue` 🆕 | ช่องเมนู icon + label · disabled = เทา |
+| `router/index.ts` | หน้าเลือกแผงเดิมย้ายไป `/walkin/book` (name `walkin-book`) · ปุ่ม `<` กลับ `/` |
+| `stores/auth.ts` + `api/auth.ts` | token เดิมใน localStorage → เรียก `/api/auth/me` เอาชื่อ user (token เสีย → login ใหม่) |
+
+- สีตามดีไซน์ใช้ Tailwind built-in (`emerald-500/600`, `indigo-50/500`, `slate-*`) — ดีไซน์มาจาก Tailwind v4 hex ต่างจาก v3 นิดหน่อย
+- **ยังไม่มีฟีเจอร์รองรับ:** ยกเลิกการจอง, แจ้งเปิดแผงสาย (ไม่มี API · disabled ไว้) · ข้อมูลแผงค้า, ประวัติการจอง, โปรไฟล์ (กดได้ตามดีไซน์แต่ยังไม่มีหน้า)
+- **เดาไว้ รอยืนยันกับดีไซน์:** การ์ดตอนจองแล้ว = "สถานะ : จองแล้ว" + "แผงของคุณ B-03" · ชื่อบนการ์ด = ชื่อร้านที่จอง ถ้ายังไม่จอง = ชื่อ user
+
+**หน้าข้อมูลร้านค้า (ยังไม่ commit · บันทึกยังไม่ได้):**
+
+| ไฟล์ | ทำอะไร |
+|------|--------|
+| `views/WalkinShopView.vue` 🆕 | `/walkin/shop` ฟอร์ม 6 ช่อง · เติมชื่อ/เบอร์จาก user · เบอร์ต้อง `^0\d{9}$` · ยกเลิก/บันทึกแล้วกลับ `/` |
+| `components/FormInput.vue` / `FormSelect.vue` 🆕 | ช่องกรอก/dropdown ใช้ซ้ำ (`defineModel`) |
+| `api/shop.ts` 🆕 | `PRODUCT_TYPES` (ผัก ผลไม้ ของกินเล่น อาหารสด ของหวาน) · `fetchZones` · `saveShopProfile` → `PUT /api/me/shop` |
+| backend `GET /api/zones` 🆕 | `repository/stall.go` → `usecase/stall.go` → `handler/stall.go` · SELECT DISTINCT zone · ต้อง login (ทุก role) |
+
+- **🔴 ค้าง:** ยังไม่ได้ตัดสินใจว่าจะเก็บข้อมูลร้านที่ไหน (คอลัมน์ใน `users` vs ตาราง `shop_profiles`) → `PUT /api/me/shop` ยังไม่มี กดบันทึกจะได้ "บันทึกไม่สำเร็จ"
+- LINE ID ในฟอร์ม ≠ `users.line_user_id` (อันนั้นคือรหัส LINE login) → ต้องคอลัมน์ใหม่
+- ตกลงไว้แล้ว: ข้อมูลร้านจะใช้กับการ์ดหน้าแรก + เติมฟอร์มจองให้อัตโนมัติ
+
 **⚠️ สำคัญ:** `AppHeader.vue` **ยังใช้อยู่** ในอีก 3 หน้า (staff/regular/directory) — **ห้ามลบ** จนกว่าจะ redesign ครบทุกหน้า
 
 **🔴 ติดรอดีไซน์จากเพื่อน (ทำต่อไม่ได้):**
@@ -263,17 +290,24 @@ CheckedAt        *time.Time
 - เวลาใช้ `Asia/Bangkok` เสมอ; `market_date` เป็น type `date` (`internal/pkg/timeutil`)
 - Business error อยู่ใน `internal/domain/errors.go`; **handler** เป็นที่เดียวที่ map → HTTP status
 - `national_id` = PII: ห้าม return ออก public API (`json:"-"`); production ต้อง encrypt
-- Idempotent: การเช็คชื่อ (`MarkAttendance`) และการจอง (middleware `Idempotency-Key`) ต้องกดซ้ำได้ไม่พัง
+- Idempotent (ตามกฎธุรกิจ ไม่มี `Idempotency-Key` middleware): กดซ้ำหลังสำเร็จได้คำตอบสำเร็จเหมือนเดิม
+  - **จอง:** มี BOOKED วันนี้แล้ว + แผงเดียวกับที่ขอ → 201 (ไม่จองซ้ำ) · แผงอื่น → 409
+  - **แจ้งหยุด:** เป็นเจ้าของแผง (`stalls.owner_vendor_id`) + สถานะไม่ใช่ EXPECTED แล้ว → 200
+  - **เช็คชื่อ:** ค่าเดิมซ้ำ → 200 ไม่เขียน audit ซ้ำ
+  - **Known limitation:** 2 request เหมือนกันมาพร้อมกันเป๊ะ (ไม่ใช่กดซ้ำทีหลัง) ตัวที่สองยังได้ 409 — ถ้าต้องการกันกรณีนี้ต้องใช้ `Idempotency-Key` แบบเต็ม
 - Audit: `BOOK`, `CHECKIN`, `NOSHOW`, `LEAVE` → `audit_logs` ครบทุก state transition แล้ว
-  - **Known limitation (MVP):** audit อยู่บน critical path — ถ้า `audit.Create` fail หลังจองสำเร็จ request จะได้ error ทั้งที่แผงถูกจองแล้ว (consistent กับ `vendor.Leave`/`staff` ทั้งระบบ ไม่มี tx ครอบ)
-  - `BookStall` ยิง `FindVendorBookedToday` เพิ่ม 1 query เพื่อดึง detail ของ audit — optimize ได้ถ้าให้ `TryBookStall` คืน booking กลับมา
+  - **BOOK:** `BookStallWithAudit` ทำ UPDATE + เขียน audit ใน transaction เดียว — audit พัง = rollback การจองด้วย · ใช้ `RETURNING id` เลยไม่ต้อง query ซ้ำ
+  - **LEAVE:** `LeaveStallWithAudit` ทำ UPDATE + เขียน audit ใน transaction เดียว — usecase รู้ `booking.ID` จาก `GetByStallAndDate` แล้ว เลยเตรียม log ครบก่อนส่ง (ไม่ต้อง `RETURNING`)
+  - **CHECKIN / NOSHOW:** `SetAttendanceWithAudit` ทำ UPDATE + เขียน audit ใน transaction เดียว (ท่าเดียวกับ LEAVE) — ตอนนี้ทุก state transition เขียน audit ใน transaction ครบแล้ว
+  - `repository/audit.go` (`AuditRepository`) ไม่มีใครเรียกแล้ว — เก็บไว้เผื่อทำ endpoint อ่าน audit log
 - `parseMarketDate` ใน `handler/date.go` — query/body `date` ว่าง = วันนี้ Bangkok; ใช้ร่วม list/book/leave/checklist
+- `cleanText` ใน `handler/validate.go` — trim + ห้ามว่าง + ไม่เกิน 100 ตัวอักษร (นับ rune ไม่ใช่ byte) ให้ตรงกับ `size:100` ของ `shop_name`/`product_type` · เกิน = 400 แทนที่จะไปพังที่ DB เป็น 500
 
 ## API (MVP — implemented vs TODO)
 
 | Method | Endpoint | Role | สถานะ | คำอธิบาย |
 |--------|----------|------|--------|----------|
-| GET | `/health` | public | **DONE** | health check |
+| GET | `/health` | public | **DONE** | health check — ping DB (timeout 2s): ok = 200 `{"status":"ok"}`, DB ล่ม = 503 `{"status":"unavailable"}` |
 | POST | `/api/auth/mock-login` | public | **DONE** | `{role}` → `{token, user}` |
 | GET | `/api/auth/me` | any JWT | **DONE** | profile จาก token |
 | GET | `/api/stalls/available?date=` | WALKIN | **DONE** | แผงว่างใน pool |

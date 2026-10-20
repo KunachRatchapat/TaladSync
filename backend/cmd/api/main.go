@@ -33,7 +33,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// go run ./cmd/api -reseed  → รีเซ็ตข้อมูลแล้วออก (สำหรับเดโม/dev)
 	if *reseed {
 		if err := database.Reseed(db); err != nil {
 			log.Fatal(err)
@@ -55,16 +54,22 @@ func main() {
 	authHandler := handler.NewAuthHandler(authUC)
 
 	bookingRepo := repository.NewBookingRepository(db)
-	auditRepo := repository.NewAuditRepository(db)
-	bookingUC := usecase.NewBookingUsecase(bookingRepo, auditRepo)
+
+	bookingUC := usecase.NewBookingUsecase(bookingRepo)
 	bookingHandler := handler.NewBookingHandler(bookingUC)
-	vendorUC := usecase.NewVendorUsecase(bookingRepo, auditRepo)
+
+	vendorUC := usecase.NewVendorUsecase(bookingRepo)
 	vendorHandler := handler.NewVendorHandler(vendorUC)
-	staffUC := usecase.NewStaffUsecase(bookingRepo, auditRepo)
+
+	staffUC := usecase.NewStaffUsecase(bookingRepo)
 	staffHandler := handler.NewStaffHandler(staffUC)
 
 	directoryUC := usecase.NewDirectoryUsecase(bookingRepo)
 	directoryHandler := handler.NewDirectoryHandler(directoryUC)
+
+	stallRepo := repository.NewStallRepository(db)
+	stallUC := usecase.NewStallUsecase(stallRepo)
+	stallHandler := handler.NewStallHandler(stallUC)
 
 	app := fiber.New()
 	app.Use(recover.New())
@@ -75,9 +80,11 @@ func main() {
 		AllowHeaders: "Origin,Content-Type,Accept,Authorization",
 	}))
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
-	})
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.Get("/health", handler.NewHealthHandler(sqlDB).Check)
 
 	api := app.Group("/api")
 	api.Post("/auth/mock-login", authHandler.MockLogin)
@@ -88,6 +95,8 @@ func main() {
 
 	protected := api.Group("/auth", authMW)
 	protected.Get("/me", authHandler.Me)
+
+	api.Get("/zones", authMW, stallHandler.ListZones)
 
 	api.Get("/stalls/available", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.ListAvailable)
 	api.Get("/bookings/mine", authMW, middleware.RequireRoles(domain.RoleWalkin), bookingHandler.GetMine)
