@@ -35,7 +35,7 @@ const menu = computed(() => {
     { label: 'จองแผง', icon: mdiCalendarMonthOutline, disabled: booked, to: 'walkin-book' },
     { label: 'ยกเลิกการจอง', icon: mdiCancel, disabled: true },
     { label: 'แจ้งเปิดแผงสาย', icon: mdiClockOutline, disabled: true },
-    { label: 'ข้อมูลแผงค้า', icon: mdiStorefrontOutline, disabled: false },
+    { label: 'ข้อมูลร้านค้า', icon: mdiStorefrontOutline, disabled: false, to: 'walkin-shop' },
     { label: 'ประวัติการจอง', icon: mdiHistory, disabled: false },
     { label: 'โปรไฟล์', icon: mdiAccountOutline, disabled: false },
   ]
