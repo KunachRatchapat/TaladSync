@@ -64,7 +64,7 @@ async function onBooked() {
 
 <template>
   <div class="min-h-screen bg-brand-50">
-    <PageHeader title="จองแผงค้า" @back="router.back()" />
+    <PageHeader title="จองแผงค้า" @back="router.push({ name: 'walkin' })" />
 
     <main class="mx-auto max-w-app px-4 py-5">
       <h1 class="mb-5 text-center text-lg font-bold text-brand-700">

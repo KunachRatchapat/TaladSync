@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { mockLogin } from '@/api/auth'
+import { fetchMe, mockLogin } from '@/api/auth'
 import { clearStoredAuth, getStoredRole, getStoredToken, setStoredAuth } from '@/api/client'
 import type { Role, User } from '@/types'
 
@@ -14,7 +14,15 @@ export const useAuthStore = defineStore('auth', () => {
 
   
   async function ensureRole(target: Role): Promise<void> {
-    if (token.value && role.value === target) return
+    if (token.value && role.value === target) {
+      if (user.value) return
+      try {
+        user.value = await fetchMe()
+        return
+      } catch {
+        logout()
+      }
+    }
 
     loading.value = true
     error.value = ''
